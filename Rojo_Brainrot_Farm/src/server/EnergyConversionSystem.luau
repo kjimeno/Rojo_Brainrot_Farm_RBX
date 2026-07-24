@@ -57,10 +57,21 @@ local function updateBoard(plot: Instance, data)
 	)
 
 	local vault = plot:FindFirstChild("CoinVault")
-	local billboard = vault and vault:FindFirstChild("CoinVaultBillboard")
-	local amountLabel = billboard and billboard:FindFirstChild("AmountLabel")
+	local coinBillboard = vault and vault:FindFirstChild("CoinVaultBillboard")
+	local amountLabel = coinBillboard and coinBillboard:FindFirstChild("AmountLabel")
 	if amountLabel then
 		amountLabel.Text = tostring(data.PendingCoins)
+	end
+
+	local upgradePlatform = plot:FindFirstChild("UpgradePlatform")
+	local upgradeBillboard = upgradePlatform and upgradePlatform:FindFirstChild("UpgradeBillboard")
+	local costLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("CostLabel")
+	if costLabel then
+		if data.ConversionLevel >= GameConfig.ConversionUpgrade.MaxLevel then
+			costLabel.Text = "MAX LEVEL"
+		else
+			costLabel.Text = ("%d gold"):format(GameConfig.GetUpgradeCost(data.ConversionLevel))
+		end
 	end
 end
 
@@ -98,6 +109,63 @@ local function ensureCoinVaultBillboard(vault: Instance)
 	amountLabel.TextColor3 = Color3.new(1, 1, 1)
 	amountLabel.Text = "0"
 	amountLabel.Parent = billboard
+end
+
+-- Creates the floating "+0.75/s" / cost text above the UpgradePlatform, if it doesn't
+-- already exist (safe to call every server start without duplicating it). The rate line is
+-- static (every level always adds the same RatePerLevel), the cost line gets refreshed by
+-- updateBoard since it depends on the plot owner's current ConversionLevel.
+local function ensureUpgradeBillboard(platform: Instance)
+	if platform:FindFirstChild("UpgradeBillboard") then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "UpgradeBillboard"
+	billboard.Adornee = platform
+	billboard.Size = UDim2.new(0, 200, 0, 80)
+	billboard.StudsOffset = Vector3.new(0, 5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = platform
+
+	local rateLabel = Instance.new("TextLabel")
+	rateLabel.Name = "RateLabel"
+	rateLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	rateLabel.Position = UDim2.new(0, 0, 0, 0)
+	rateLabel.BackgroundTransparency = 1
+	rateLabel.Font = Enum.Font.GothamBold
+	rateLabel.TextScaled = true
+	rateLabel.TextColor3 = Color3.new(1, 1, 1)
+	rateLabel.Text = ("+%.2f/s"):format(GameConfig.ConversionUpgrade.RatePerLevel)
+	rateLabel.Parent = billboard
+
+	local costLabel = Instance.new("TextLabel")
+	costLabel.Name = "CostLabel"
+	costLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	costLabel.Position = UDim2.new(0, 0, 0.5, 0)
+	costLabel.BackgroundTransparency = 1
+	costLabel.Font = Enum.Font.GothamBold
+	costLabel.TextScaled = true
+	costLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+	costLabel.Text = ("%d gold"):format(GameConfig.GetUpgradeCost(0))
+	costLabel.Parent = billboard
+end
+
+-- Shared by both the RemoteEvent (for future UI) and the UpgradePlatform's Touched handler.
+local function tryUpgradeConversion(player: Player): (boolean, number | string)
+	local data = PlayerDataManager.Get(player)
+	if not data then return false, "Data not loaded" end
+
+	if data.ConversionLevel >= GameConfig.ConversionUpgrade.MaxLevel then
+		return false, "Max level reached"
+	end
+
+	local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
+	if data.Coins < cost then
+		return false, "Not enough coins"
+	end
+
+	data.Coins -= cost
+	data.ConversionLevel += 1
+	return true, data.ConversionLevel
 end
 
 -- ===== 2. Depositing carried energy into the silo =====
@@ -191,29 +259,48 @@ end
 
 -- ===== 5. Buying a conversion speed upgrade =====
 Remotes.UpgradeConversion.OnServerEvent:Connect(function(player)
-	local data = PlayerDataManager.Get(player)
-	if not data then return end
+	local success, resultOrError = tryUpgradeConversion(player)
+	Remotes.UpgradeConversion:FireClient(player, success, resultOrError)
 
-	if data.ConversionLevel >= GameConfig.ConversionUpgrade.MaxLevel then
-		Remotes.UpgradeConversion:FireClient(player, false, "Max level reached")
-		return
-	end
-
-	local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
-	if data.Coins < cost then
-		Remotes.UpgradeConversion:FireClient(player, false, "Not enough coins")
-		return
-	end
-
-	data.Coins -= cost
-	data.ConversionLevel += 1
-	Remotes.UpgradeConversion:FireClient(player, true, data.ConversionLevel)
-
-	local plot = getPlayerPlot(player)
-	if plot then
-		updateBoard(plot, data)
+	if success then
+		local plot = getPlayerPlot(player)
+		if plot then
+			updateBoard(plot, PlayerDataManager.Get(player))
+		end
 	end
 end)
+
+-- Step on the UpgradePlatform to buy the same conversion-speed upgrade, no UI needed.
+local function setupUpgradePlatform(plot: Instance)
+	local platform = plot:FindFirstChild("UpgradePlatform")
+	if not platform then return end
+
+	ensureUpgradeBillboard(platform)
+
+	local onCooldown = {}
+
+	platform.Touched:Connect(function(hit)
+		local character = hit.Parent
+		local player = Players:GetPlayerFromCharacter(character)
+		if not player or onCooldown[player] then return end
+
+		onCooldown[player] = true
+
+		local success, resultOrError = tryUpgradeConversion(player)
+		if success then
+			local data = PlayerDataManager.Get(player)
+			Remotes.StatsUpdate:FireClient(player, { Coins = data.Coins })
+			updateBoard(plot, data)
+			print(("[Upgrade] %s bought conversion level %s"):format(player.Name, tostring(resultOrError)))
+		else
+			print(("[Upgrade] %s failed to buy conversion upgrade: %s"):format(player.Name, tostring(resultOrError)))
+		end
+
+		task.delay(1, function()
+			onCooldown[player] = nil
+		end)
+	end)
+end
 
 -- ===== Init: wire up every plot in the workspace =====
 local function initAllPlots()
@@ -225,6 +312,7 @@ local function initAllPlots()
 	for _, plot in ipairs(plotsFolder:GetChildren()) do
 		setupDepositArea(plot)
 		setupCoinVault(plot)
+		setupUpgradePlatform(plot)
 	end
 end
 

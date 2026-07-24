@@ -1,0 +1,60 @@
+-- BuildUpgradePlatform.luau
+-- NOT synced by Rojo (not referenced in default.project.json) — this is a one-time
+-- Studio Command Bar script, not part of the running game.
+--
+-- Paste this whole file into Studio's View > Command Bar and press Enter once.
+-- Adds an "UpgradePlatform" Part to every existing plot under Workspace.Plots
+-- (skipping any plot that already has one), positioned just beside that plot's
+-- ConversionBoard/CoinVault so it lands somewhere reasonable — nudge it afterward
+-- if it's not exactly where you want it.
+--
+-- After running it, restart your Play Test / rojo-served session so
+-- EnergyConversionSystem.luau (which scans for UpgradePlatforms once at server start)
+-- picks it up and attaches the floating "+0.75/s" / cost text.
+
+local Workspace = game:GetService("Workspace")
+
+local plotsFolder = Workspace:FindFirstChild("Plots")
+if not plotsFolder then
+	warn("[UpgradePlatformBuilder] No Workspace.Plots folder found — build your plots first.")
+	return
+end
+
+local PLATFORM_SIZE = Vector3.new(6, 1, 6)
+local OFFSET_FROM_REFERENCE = Vector3.new(-8, 0, 0)
+
+for _, plot in ipairs(plotsFolder:GetChildren()) do
+	if plot:FindFirstChild("UpgradePlatform") then
+		print(("[UpgradePlatformBuilder] %s already has an UpgradePlatform, skipping"):format(plot.Name))
+		continue
+	end
+
+	local reference = plot:FindFirstChild("ConversionBoard", true) or plot:FindFirstChild("CoinVault")
+	local basePosition
+	if reference and reference:IsA("BasePart") then
+		basePosition = reference.Position + OFFSET_FROM_REFERENCE
+	elseif reference and (reference:IsA("Model")) then
+		local ok, pivot = pcall(function()
+			return reference:GetPivot()
+		end)
+		basePosition = (ok and pivot.Position + OFFSET_FROM_REFERENCE) or Vector3.new(0, 0.5, 0)
+	elseif plot:IsA("Model") or plot:IsA("BasePart") then
+		local ok, pivot = pcall(function()
+			return plot:GetPivot()
+		end)
+		basePosition = (ok and pivot.Position) or Vector3.new(0, 0.5, 0)
+	else
+		basePosition = Vector3.new(0, 0.5, 0)
+	end
+
+	local platform = Instance.new("Part")
+	platform.Name = "UpgradePlatform"
+	platform.Size = PLATFORM_SIZE
+	platform.Anchored = true
+	platform.Material = Enum.Material.Neon
+	platform.Color = Color3.fromRGB(255, 140, 0)
+	platform.Position = basePosition
+	platform.Parent = plot
+
+	print(("[UpgradePlatformBuilder] Added UpgradePlatform to %s at %s -- reposition as needed"):format(plot.Name, tostring(basePosition)))
+end
