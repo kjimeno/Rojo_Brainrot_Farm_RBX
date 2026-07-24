@@ -5,6 +5,9 @@
 local GameConfig = {}
 
 -- ============ BRAINROT TIERS ============
+-- Names/prices/drop rates below are placeholders like everything else so far -- swap them
+-- for whatever real "brainrot" names/balancing you want later. Price keeps the x5-per-tier
+-- pattern you set for tiers 1-5; EnergyPerDrop keeps roughly the same ~2.5x-per-tier curve.
 GameConfig.Brainrots = {
 	["Tralalero"] = {
 		Tier = 1,
@@ -39,23 +42,94 @@ GameConfig.Brainrots = {
 		Price = 3125,
 		EnergyPerDrop = 50,
 		DropInterval = 3,
+		MergeInto = "BrrBrrPatapim",
+	},
+	["BrrBrrPatapim"] = {
+		Tier = 6,
+		Price = 15625,
+		EnergyPerDrop = 125,
+		DropInterval = 3,
+		MergeInto = "LiriliLarila",
+	},
+	["LiriliLarila"] = {
+		Tier = 7,
+		Price = 78125,
+		EnergyPerDrop = 310,
+		DropInterval = 3,
+		MergeInto = "ChimpanziniBananini",
+	},
+	["ChimpanziniBananini"] = {
+		Tier = 8,
+		Price = 390625,
+		EnergyPerDrop = 780,
+		DropInterval = 3,
+		MergeInto = "BombombiniGusini",
+	},
+	["BombombiniGusini"] = {
+		Tier = 9,
+		Price = 1953125,
+		EnergyPerDrop = 1950,
+		DropInterval = 3,
+		MergeInto = "TrulimeroTrulicina",
+	},
+	["TrulimeroTrulicina"] = {
+		Tier = 10,
+		Price = 9765625,
+		EnergyPerDrop = 4900,
+		DropInterval = 3,
+		MergeInto = "OdinDinDinDun",
+	},
+	["OdinDinDinDun"] = {
+		Tier = 11,
+		Price = 48828125,
+		EnergyPerDrop = 12250,
+		DropInterval = 3,
+		MergeInto = "BonecaAmbalabu",
+	},
+	["BonecaAmbalabu"] = {
+		Tier = 12,
+		Price = 244140625,
+		EnergyPerDrop = 30600,
+		DropInterval = 3,
+		MergeInto = "FrigoCamelo",
+	},
+	["FrigoCamelo"] = {
+		Tier = 13,
+		Price = 1220703125,
+		EnergyPerDrop = 76500,
+		DropInterval = 3,
+		MergeInto = "GirafaCelestre",
+	},
+	["GirafaCelestre"] = {
+		Tier = 14,
+		Price = 6103515625,
+		EnergyPerDrop = 191000,
+		DropInterval = 3,
+		MergeInto = "TrenostruzzoTurbo",
+	},
+	["TrenostruzzoTurbo"] = {
+		Tier = 15,
+		Price = 30517578125,
+		EnergyPerDrop = 478000,
+		DropInterval = 3,
 		MergeInto = nil, -- max tier for now
 	},
 }
 
 GameConfig.BrainrotOrder = {
 	"Tralalero", "TrippiTroppi", "BombardiroCrocodilo", "CappuccinoAssassino", "TungTungSahur",
+	"BrrBrrPatapim", "LiriliLarila", "ChimpanziniBananini", "BombombiniGusini", "TrulimeroTrulicina",
+	"OdinDinDinDun", "BonecaAmbalabu", "FrigoCamelo", "GirafaCelestre", "TrenostruzzoTurbo",
 }
 
 -- Placeholder-model tint per tier, so identical placeholder blocks are still visually
--- distinguishable at a glance until you swap in real models.
-GameConfig.TierColors = {
-	[1] = Color3.fromRGB(85, 255, 127),  -- green
-	[2] = Color3.fromRGB(85, 170, 255),  -- blue
-	[3] = Color3.fromRGB(255, 170, 0),   -- orange
-	[4] = Color3.fromRGB(255, 85, 255),  -- magenta
-	[5] = Color3.fromRGB(255, 60, 60),   -- red
-}
+-- distinguishable at a glance until you swap in real models. Generated as an even spread
+-- around the color wheel so it automatically covers however many tiers BrainrotOrder has,
+-- instead of hand-picking a fixed list of RGB values.
+GameConfig.TierColors = {}
+for tier = 1, #GameConfig.BrainrotOrder do
+	GameConfig.TierColors[tier] = Color3.fromHSV((tier - 1) / #GameConfig.BrainrotOrder, 0.85, 0.95)
+end
 
 -- How many of the same tier are needed to merge into the next tier
 GameConfig.MergeRequirement = 3
