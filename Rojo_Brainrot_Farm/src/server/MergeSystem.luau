@@ -3,7 +3,6 @@
 -- Handles merging GameConfig.MergeRequirement copies of the same-tier brainrot into the next tier.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
@@ -11,8 +10,6 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
-
-local BrainrotModelsFolder = ServerStorage:WaitForChild("BrainrotModels")
 
 local function mergeBrainrots(player: Player, ids: { string })
 	local data = PlayerDataManager.Get(player)
@@ -46,6 +43,19 @@ local function mergeBrainrots(player: Player, ids: { string })
 		return false, "This brainrot is already max tier"
 	end
 
+	for _, matchEntry in ipairs(matches) do
+		for i, entry in ipairs(data.OwnedBrainrots) do
+			if entry.Id == matchEntry.Id then
+				table.remove(data.OwnedBrainrots, i)
+				break
+			end
+		end
+	end
+
+	local newName = config.MergeInto
+	local newId = HttpService:GenerateGUID(false)
+	table.insert(data.OwnedBrainrots, { Name = newName, Id = newId })
+
 	local plotsFolder = workspace:FindFirstChild("Plots")
 	local plot = nil
 	if plotsFolder then
@@ -57,57 +67,12 @@ local function mergeBrainrots(player: Player, ids: { string })
 		end
 	end
 
-	-- Brainrot models are parented directly to the physical slot they're sitting on (see
-	-- BrainrotSpawner.buyBrainrot), so `child.Parent` here is the actual BrainrotSlots part —
-	-- destroying the model automatically frees that slot for getNextSlot's live occupancy count.
-	-- We also grab the old model's exact CFrame before destroying it so the merged result
-	-- reappears in the same spot (same slot + stacked layer) instead of anywhere new.
-	local freedSlot = nil
-	local freedCFrame = nil
-	for _, matchEntry in ipairs(matches) do
-		for i, entry in ipairs(data.OwnedBrainrots) do
-			if entry.Id == matchEntry.Id then
-				table.remove(data.OwnedBrainrots, i)
-				break
-			end
-		end
-
-		if plot then
-			for _, child in ipairs(plot:GetDescendants()) do
-				if child:GetAttribute("BrainrotId") == matchEntry.Id then
-					local slot = child.Parent
-					if slot and slot:IsA("BasePart") then
-						freedSlot = slot
-						if child:IsA("Model") and child.PrimaryPart then
-							freedCFrame = child:GetPrimaryPartCFrame()
-						end
-					end
-					child:Destroy()
-					break
-				end
-			end
-		end
-	end
-
-	local newName = config.MergeInto
-	local newId = HttpService:GenerateGUID(false)
-	table.insert(data.OwnedBrainrots, { Name = newName, Id = newId })
-
-	if plot and freedSlot then
-		local template = BrainrotModelsFolder:FindFirstChild(newName)
-		if template then
-			local model = template:Clone()
-			model:SetAttribute("BrainrotId", newId)
-			model:SetAttribute("OwnerUserId", player.UserId)
-			BrainrotSpawner.ColorModelByTier(model, newName)
-			BrainrotSpawner.AnchorModel(model)
-			if model.PrimaryPart and freedCFrame then
-				model:SetPrimaryPartCFrame(freedCFrame)
-			end
-			model.Parent = freedSlot
-
-			BrainrotSpawner.StartEnergyLoop(player, model, newName, plot)
-		end
+	-- Full repack rather than just reusing the one freed slot: merging removes 3 brainrots
+	-- from potentially 3 different spots, so only patching the last one would leave holes
+	-- wherever the other two used to sit. RepackPlot wipes and rebuilds the whole layout from
+	-- data.OwnedBrainrots, highest tier first, with no gaps in the bottom row.
+	if plot then
+		BrainrotSpawner.RepackPlot(player, plot, data)
 	end
 
 	return true, newName

@@ -47,14 +47,24 @@ local function countOccupants(slot: Instance): number
 	return count
 end
 
+-- Physical BrainrotSlots parts, ordered left-to-right (ascending world X) so "slot 1" is
+-- always the same physical spot. Flip to .Z if your plot's row runs along that axis instead.
+local function getSortedSlots(plot: Instance): { Instance }
+	local slotsFolder = plot:FindFirstChild("BrainrotSlots")
+	if not slotsFolder then return {} end
+
+	local slots = slotsFolder:GetChildren()
+	table.sort(slots, function(a, b)
+		return a.Position.X < b.Position.X
+	end)
+	return slots
+end
+
 -- Returns the next open (slot, layer) pair. Fills layer 0 across every physical BrainrotSlots
 -- part first, then starts stacking layer 1 above them once all base slots are full, and so on --
 -- forms a 2D grid once a player owns more brainrots than there are physical slots for.
 local function getNextSlot(plot: Instance): (Instance?, number?)
-	local slotsFolder = plot:FindFirstChild("BrainrotSlots")
-	if not slotsFolder then return nil, nil end
-
-	local slots = slotsFolder:GetChildren()
+	local slots = getSortedSlots(plot)
 	if #slots == 0 then return nil, nil end
 
 	local maxLayers = math.ceil(GameConfig.MaxBrainrotsPerPlot / #slots)
@@ -220,6 +230,56 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 	return true, data.Coins
 end
 
+-- Wipes every brainrot model currently on `plot` and rebuilds them from `data.OwnedBrainrots`
+-- with no gaps: highest tier first, filling the bottom row (layer 0) left-to-right before
+-- stacking a layer above it. Called after every merge so the plot never keeps stale holes
+-- where the merged-away brainrots used to sit.
+local function repackPlot(player: Player, plot: Instance, data)
+	local slots = getSortedSlots(plot)
+	if #slots == 0 then return end
+
+	-- Destroying each old model stops its energy loop next iteration (the loop's while
+	-- condition checks brainrotModel.Parent, which Destroy() clears).
+	for _, slot in ipairs(slots) do
+		for _, child in ipairs(slot:GetChildren()) do
+			if child:GetAttribute("BrainrotId") ~= nil then
+				child:Destroy()
+			end
+		end
+	end
+
+	local sortedEntries = {}
+	for _, entry in ipairs(data.OwnedBrainrots) do
+		table.insert(sortedEntries, entry)
+	end
+	table.sort(sortedEntries, function(a, b)
+		local tierA = GameConfig.Brainrots[a.Name] and GameConfig.Brainrots[a.Name].Tier or 0
+		local tierB = GameConfig.Brainrots[b.Name] and GameConfig.Brainrots[b.Name].Tier or 0
+		return tierA > tierB
+	end)
+
+	local numSlots = #slots
+	for index, entry in ipairs(sortedEntries) do
+		local template = BrainrotModelsFolder:FindFirstChild(entry.Name)
+		if template then
+			local slot = slots[((index - 1) % numSlots) + 1]
+			local layer = math.floor((index - 1) / numSlots)
+
+			local model = template:Clone()
+			model:SetAttribute("BrainrotId", entry.Id)
+			model:SetAttribute("OwnerUserId", player.UserId)
+			colorModelByTier(model, entry.Name)
+			anchorModel(model)
+			if model.PrimaryPart then
+				model:SetPrimaryPartCFrame(slotCFrame(slot, layer))
+			end
+			model.Parent = slot
+
+			startEnergyLoop(player, model, entry.Name, plot)
+		end
+	end
+end
+
 Remotes.BuyBrainrot.OnServerEvent:Connect(function(player, brainrotName, quantity)
 	local success, resultOrError = buyBrainrot(player, brainrotName, quantity)
 	Remotes.BuyBrainrot:FireClient(player, success, resultOrError)
@@ -230,4 +290,5 @@ return {
 	BuyBrainrot = buyBrainrot,
 	ColorModelByTier = colorModelByTier,
 	AnchorModel = anchorModel,
+	RepackPlot = repackPlot,
 }
