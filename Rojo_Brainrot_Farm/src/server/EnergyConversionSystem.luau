@@ -10,6 +10,9 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 
+local AFFORD_COLOR = Color3.fromRGB(85, 255, 127)
+local CANT_AFFORD_COLOR = Color3.fromRGB(255, 60, 60)
+
 -- ===== 1. Energy collection =====
 -- Handled in BrainrotSpawner.luau via Tween.Completed instead of a Touched listener here —
 -- Touched never fires between two Anchored parts, and both the energy part and the Collector
@@ -64,13 +67,17 @@ local function updateBoard(plot: Instance, data)
 	end
 
 	local upgradePlatform = plot:FindFirstChild("UpgradePlatform")
-	local upgradeBillboard = upgradePlatform and upgradePlatform:FindFirstChild("UpgradeBillboard")
-	local costLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("CostLabel")
-	if costLabel then
+	if upgradePlatform then
+		local upgradeBillboard = upgradePlatform:FindFirstChild("UpgradeBillboard")
+		local costLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("CostLabel")
+
 		if data.ConversionLevel >= GameConfig.ConversionUpgrade.MaxLevel then
-			costLabel.Text = "MAX LEVEL"
+			if costLabel then costLabel.Text = "MAX LEVEL" end
+			upgradePlatform.Color = Color3.new(1, 1, 1)
 		else
-			costLabel.Text = ("%d gold"):format(GameConfig.GetUpgradeCost(data.ConversionLevel))
+			local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
+			if costLabel then costLabel.Text = ("%d gold"):format(cost) end
+			upgradePlatform.Color = (data.Coins >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
 		end
 	end
 end
@@ -319,4 +326,7 @@ end
 initAllPlots()
 startConversionLoop()
 
-return true
+return {
+	GetPlayerPlot = getPlayerPlot,
+	UpdateBoard = updateBoard,
+}

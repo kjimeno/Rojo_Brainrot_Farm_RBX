@@ -16,6 +16,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
+local EnergyConversionSystem = require(script.Parent.EnergyConversionSystem)
 
 -- Floating "Buy 5x Tralalero / 25 gold" text above a shop platform (the Part the
 -- ProximityPrompt is parented to). Created once per prompt, safe to re-run on server start.
@@ -80,6 +81,14 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 	if success then
 		local data = PlayerDataManager.Get(player)
 		Remotes.StatsUpdate:FireClient(player, { Coins = data.Coins })
+
+		-- Spending coins here can change whether the player can afford their next
+		-- conversion upgrade, so refresh that sign's afford/can't-afford color too.
+		local plot = EnergyConversionSystem.GetPlayerPlot(player)
+		if plot then
+			EnergyConversionSystem.UpdateBoard(plot, data)
+		end
+
 		print(("[Shop] %s bought %dx %s. Coins left: %d"):format(player.Name, quantity, brainrotName, data.Coins))
 	else
 		print(("[Shop] %s failed to buy %dx %s: %s"):format(player.Name, quantity, brainrotName, tostring(resultOrError)))
