@@ -4,7 +4,6 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
-local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
@@ -65,6 +64,12 @@ end
 -- Studs between each stacked "row" once every physical BrainrotSlots part already has one
 -- brainrot on it -- tweak to taste once you see it against your actual slot/model sizes.
 local STACK_LAYER_HEIGHT = 4
+
+-- Where each energy drop spawns relative to the brainrot that produced it: this many studs
+-- out in front of it (along whichever way its model is actually facing) and this many studs
+-- up. Tweak these two to taste once you see it against your model sizes.
+local ENERGY_DROP_DISTANCE = -3
+local ENERGY_DROP_HEIGHT = 2
 
 -- Occupancy is derived live from what's actually parented to the slot (each brainrot model
 -- is parented directly to the slot it's sitting on), so there's no separate "Occupied" flag
@@ -173,15 +178,24 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 		while brainrotModel.Parent and player.Parent do
 			task.wait(config.DropInterval)
 
-			local conveyorStart = plot:FindFirstChild("ConveyorStart")
-			if not conveyorStart then continue end
+			local primaryPart = brainrotModel.PrimaryPart
+			if not primaryPart then continue end
 
 			local energyTemplate = getEnergyTemplate(config.Tier)
 			local energyPart = energyTemplate:Clone()
 			tintEnergyPart(energyPart, config.Tier)
 			energyPart:SetAttribute("EnergyValue", config.EnergyPerDrop)
 			energyPart:SetAttribute("OwnerUserId", player.UserId)
-			energyPart.CFrame = conveyorStart.CFrame + Vector3.new(0, 2, 0)
+
+			-- Real physics: it actually falls under gravity and collides with the world
+			-- (your conveyor belt included), instead of being teleported along a scripted path.
+			-- Forced every spawn regardless of how the template itself was authored in Studio.
+			energyPart.Anchored = false
+			energyPart.CanCollide = true
+			-- Local -Z is "forward" in Roblox's CFrame convention, so this multiplication spawns
+			-- it ENERGY_DROP_DISTANCE studs out in front of the brainrot (rotated correctly with
+			-- however the model is actually facing) and ENERGY_DROP_HEIGHT studs up.
+			energyPart.CFrame = primaryPart.CFrame * CFrame.new(0, ENERGY_DROP_HEIGHT, -ENERGY_DROP_DISTANCE)
 			energyPart.Parent = workspace
 
 			-- Player must physically walk into the energy part to collect it.
@@ -206,29 +220,15 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 				energyPart:Destroy()
 			end)
 
-			local conveyorEnd = plot:FindFirstChild("ConveyorEnd")
-			if conveyorEnd then
-				local tween = TweenService:Create(
-					energyPart,
-					TweenInfo.new(GameConfig.ConveyorTravelTime, Enum.EasingStyle.Linear),
-					{ CFrame = conveyorEnd.CFrame + Vector3.new(0, 2, 0) }
-				)
-				tween:Play()
-
-				tween.Completed:Connect(function()
-					-- Give the player a grace window to walk over and grab it once it reaches
-					-- the end of the belt, then despawn it if it's never collected so parts
-					-- don't pile up forever.
-					task.wait(10)
-					if touchConnection then touchConnection:Disconnect() end
-					if energyPart.Parent and not collected then
-						energyPart:Destroy()
-					end
-				end)
-			else
+			-- No more scripted CFrame tweening down a conveyor -- your real conveyor belt will
+			-- move it via actual physics once it's built. This is just a cleanup timer so an
+			-- uncollected drop doesn't sit in the world forever.
+			task.delay(GameConfig.ConveyorTravelTime + 10, function()
 				if touchConnection then touchConnection:Disconnect() end
-				energyPart:Destroy() -- no conveyor end configured, don't leave orphan parts around
-			end
+				if energyPart.Parent and not collected then
+					energyPart:Destroy()
+				end
+			end)
 		end
 	end)
 end
