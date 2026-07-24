@@ -15,9 +15,41 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 -- NOTE: these ServerStorage folders are NOT managed by Rojo in this scaffold —
 -- create them manually in Studio (right-click ServerStorage > Insert Object):
 --   ServerStorage/BrainrotModels/<BrainrotName> (one Model per name in GameConfig.Brainrots)
---   ServerStorage/EnergyPart (a Part/Model representing one unit of energy)
+--   ServerStorage/EnergyPart (a Part representing one unit of energy -- the fallback used by
+--     any tier that doesn't have its own EnergyModels/Tier<N> below)
+--   ServerStorage/EnergyModels/Tier<N> (OPTIONAL -- one Part per tier, e.g. "Tier1".."Tier15",
+--     for a visually distinct energy drop per brainrot tier. See studio-tools/BuildTieredEnergyParts.luau.
+--     Must be a Part, not a Model -- energy pickups use .CFrame/.Touched directly, same as EnergyPart.)
 local BrainrotModelsFolder = ServerStorage:WaitForChild("BrainrotModels")
 local EnergyPartTemplate = ServerStorage:WaitForChild("EnergyPart")
+local EnergyModelsFolder = ServerStorage:FindFirstChild("EnergyModels")
+
+local function getEnergyTemplate(tier: number): Instance
+	if EnergyModelsFolder then
+		local tierTemplate = EnergyModelsFolder:FindFirstChild("Tier" .. tostring(tier))
+		if tierTemplate then
+			return tierTemplate
+		end
+	end
+	return EnergyPartTemplate
+end
+
+-- Tints the energy pickup by tier (same GameConfig.TierColors used for brainrot placeholders),
+-- so tiers are visually distinct even before you've built a dedicated EnergyModels/Tier<N>
+-- for every tier -- e.g. tier 1 comes out as a plain yellow-ish bulb, tier 2 green, etc.
+local function tintEnergyPart(energyPart: Instance, tier: number)
+	local color = GameConfig.TierColors[tier]
+	if not color then return end
+
+	if energyPart:IsA("BasePart") then
+		energyPart.Color = color
+	end
+	for _, descendant in ipairs(energyPart:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Color = color
+		end
+	end
+end
 
 local function getPlayerPlot(player: Player)
 	local plotsFolder = workspace:FindFirstChild("Plots")
@@ -144,7 +176,9 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			local conveyorStart = plot:FindFirstChild("ConveyorStart")
 			if not conveyorStart then continue end
 
-			local energyPart = EnergyPartTemplate:Clone()
+			local energyTemplate = getEnergyTemplate(config.Tier)
+			local energyPart = energyTemplate:Clone()
+			tintEnergyPart(energyPart, config.Tier)
 			energyPart:SetAttribute("EnergyValue", config.EnergyPerDrop)
 			energyPart:SetAttribute("OwnerUserId", player.UserId)
 			energyPart.CFrame = conveyorStart.CFrame + Vector3.new(0, 2, 0)
