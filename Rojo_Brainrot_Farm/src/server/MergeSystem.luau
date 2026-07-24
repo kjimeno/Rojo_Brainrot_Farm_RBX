@@ -134,16 +134,36 @@ local function findMatchingIds(data, brainrotName: string, count: number): { str
 	return ids
 end
 
--- MergePlatform's "MergeBrainrotName" attribute picks which tier it merges (defaults to the
--- tier-1 brainrot, since that's the one you asked for — set the attribute to make another
--- copy of this platform merge a different tier).
+-- Merges every complete group of GameConfig.MergeRequirement, at EVERY tier, cascading all
+-- the way up to tier 5 in one call. GameConfig.BrainrotOrder lists tiers low-to-high, and this
+-- drains a tier's triples into the next tier before moving on to process that next tier --
+-- so 9 owned Tralalero (tier 1) becomes 3 TrippiTroppi (tier 2) becomes 1 BombardiroCrocodilo
+-- (tier 3), all within this single pass, since each tier's newly-created entries are already
+-- in data.OwnedBrainrots by the time we get to processing that tier.
+local function mergeAllPossible(data): number
+	local mergeCount = 0
+	for _, brainrotName in ipairs(GameConfig.BrainrotOrder) do
+		while true do
+			local ids = findMatchingIds(data, brainrotName, GameConfig.MergeRequirement)
+			if #ids < GameConfig.MergeRequirement then break end
+
+			local success, resultOrError = mergeIds(data, ids)
+			if not success then
+				warn(("[Merge] merge stopped early for %s: %s"):format(brainrotName, tostring(resultOrError)))
+				break
+			end
+			mergeCount += 1
+		end
+	end
+	return mergeCount
+end
+
 local function setupMergePlatform(plot: Instance)
 	local platform = plot:FindFirstChild("MergePlatform")
 	if not platform then return end
 
 	ensureMergeBillboard(platform)
 
-	local mergeBrainrotName = platform:GetAttribute("MergeBrainrotName") or "Tralalero"
 	local onCooldown = {}
 
 	platform.Touched:Connect(function(hit)
@@ -154,40 +174,20 @@ local function setupMergePlatform(plot: Instance)
 		local data = PlayerDataManager.Get(player)
 		if not data then return end
 
-		local ids = findMatchingIds(data, mergeBrainrotName, GameConfig.MergeRequirement)
-		if #ids < GameConfig.MergeRequirement then return end -- not enough yet, stay quiet
+		local mergeCount = mergeAllPossible(data)
+		if mergeCount == 0 then return end -- nothing mergeable at any tier, stay quiet
 
 		onCooldown[player] = true
 
-		-- Merge every complete group of 3 in one step (e.g. 6 owned -> 2 merges), instead of
-		-- requiring one platform touch per merge. Each mergeIds call is just data bookkeeping;
-		-- the plot only gets repacked once at the end, not once per merge.
-		local mergeCount = 0
-		while true do
-			local nextIds = findMatchingIds(data, mergeBrainrotName, GameConfig.MergeRequirement)
-			if #nextIds < GameConfig.MergeRequirement then break end
-
-			local success, resultOrError = mergeIds(data, nextIds)
-			if not success then
-				warn(("[Merge] %s merge stopped early: %s"):format(player.Name, tostring(resultOrError)))
-				break
-			end
-			mergeCount += 1
+		-- Re-looked-up rather than reusing the outer `plot` param: this platform's Touched
+		-- fires for whichever player steps on it, so this always repacks the TOUCHING
+		-- player's own plot, even if they're standing on someone else's platform.
+		local ownerPlot = getPlayerPlot(player)
+		if ownerPlot then
+			BrainrotSpawner.RepackPlot(player, ownerPlot, data)
 		end
-
-		if mergeCount > 0 then
-			-- Re-looked-up rather than reusing the outer `plot` param: this platform's Touched
-			-- fires for whichever player steps on it, so this always repacks the TOUCHING
-			-- player's own plot, even if they're standing on someone else's platform.
-			local ownerPlot = getPlayerPlot(player)
-			if ownerPlot then
-				BrainrotSpawner.RepackPlot(player, ownerPlot, data)
-			end
-			Remotes.MergeBrainrots:FireClient(player, true, mergeCount)
-			print(("[Merge] %s merged %d group(s) of %dx %s"):format(
-				player.Name, mergeCount, GameConfig.MergeRequirement, mergeBrainrotName
-			))
-		end
+		Remotes.MergeBrainrots:FireClient(player, true, mergeCount)
+		print(("[Merge] %s merged %d group(s) across all tiers"):format(player.Name, mergeCount))
 
 		task.delay(1, function()
 			onCooldown[player] = nil
