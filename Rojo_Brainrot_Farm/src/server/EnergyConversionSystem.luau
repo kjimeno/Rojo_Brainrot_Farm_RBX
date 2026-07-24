@@ -192,11 +192,9 @@ local function setupDepositArea(plot: Instance)
 
 		playersInside[player] = true
 
-		local spaceLeft = GameConfig.MaxSiloCapacity - data.SiloEnergy
-		local toDeposit = math.min(data.StoredEnergy, math.max(spaceLeft, 0))
-
-		data.SiloEnergy += toDeposit
-		data.StoredEnergy -= toDeposit
+		-- No cap -- move all carried energy into the silo in one go.
+		data.SiloEnergy += data.StoredEnergy
+		data.StoredEnergy = 0
 
 		Remotes.StatsUpdate:FireClient(player, {
 			StoredEnergy = data.StoredEnergy,

@@ -135,8 +135,8 @@ end
 GameConfig.MergeRequirement = 3
 
 -- ============ ENERGY -> COIN CONVERSION ============
+-- No cap on the silo -- depositing always moves your entire carried StoredEnergy in at once.
 GameConfig.BaseConversionRate = 1
-GameConfig.MaxSiloCapacity = 500
 
 GameConfig.ConversionUpgrade = {
 	MaxLevel = 20,
@@ -154,7 +154,11 @@ function GameConfig.GetConversionRate(level: number): number
 end
 
 -- ============ PLOT / CONVEYOR ============
-GameConfig.MaxBrainrotsPerPlot = 12
+-- 9 columns x 3 rows. BrainrotSpawner derives the grid shape from however many physical
+-- BrainrotSlots parts a plot actually has (that's the column count) and this total, so for
+-- this to come out as exactly 9x3 each plot needs exactly 9 BrainrotSlots parts built in
+-- Studio (see studio-tools/BuildBrainrotGrid.luau) -- ceil(27 / 9) = 3 layers.
+GameConfig.MaxBrainrotsPerPlot = 27
 GameConfig.ConveyorTravelTime = 4
 
 return GameConfig
