@@ -16,6 +16,47 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 -- part are Anchored, so a Touched-based approach on this part would silently never trigger.
 -- Kept the Collector part itself in your plot for visual/positional reference only.
 
+local function getPlayerPlot(player: Player)
+	local plotsFolder = workspace:FindFirstChild("Plots")
+	if not plotsFolder then return nil end
+	for _, plot in ipairs(plotsFolder:GetChildren()) do
+		if plot:GetAttribute("OwnerUserId") == player.UserId then
+			return plot
+		end
+	end
+	return nil
+end
+
+-- Refreshes the physical SurfaceGui board on the player's plot (built manually in Studio as
+-- <plot>/ConversionBoard/Board/SurfaceGui/Label) to reflect their current silo/coin numbers.
+-- Searches recursively for the SurfaceGui/Label since they live on a child part ("Board")
+-- inside the ConversionBoard model, not on the model itself.
+local function updateBoard(plot: Instance, data)
+	local board = plot:FindFirstChild("ConversionBoard", true)
+	if not board then
+		warn("[EnergyConversionSystem] No ConversionBoard found under " .. plot.Name)
+		return
+	end
+
+	local surfaceGui = board:FindFirstChildWhichIsA("SurfaceGui", true)
+	if not surfaceGui then
+		warn("[EnergyConversionSystem] ConversionBoard under " .. plot.Name .. " has no SurfaceGui descendant")
+		return
+	end
+
+	local label = surfaceGui:FindFirstChild("Label", true) or surfaceGui:FindFirstChildWhichIsA("TextLabel", true)
+	if not label then
+		warn("[EnergyConversionSystem] SurfaceGui on " .. plot.Name .. "'s ConversionBoard has no Label/TextLabel")
+		return
+	end
+
+	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
+	label.Text = string.format(
+		"Silo: %d\nPending Coins: %d\nRate: %.1f/s",
+		data.SiloEnergy, data.PendingCoins, rate
+	)
+end
+
 -- ===== 2. Depositing carried energy into the silo =====
 local function setupDepositArea(plot: Instance)
 	local depositPart = plot:FindFirstChild("DepositArea")
@@ -43,6 +84,7 @@ local function setupDepositArea(plot: Instance)
 			StoredEnergy = data.StoredEnergy,
 			SiloEnergy = data.SiloEnergy,
 		})
+		updateBoard(plot, data)
 
 		task.delay(1, function()
 			playersInside[player] = nil
@@ -50,7 +92,7 @@ local function setupDepositArea(plot: Instance)
 	end)
 end
 
--- ===== 3. Converting silo energy -> pending coins over time =====
+-- ===== 3. Converting silo energy -> pending coins over time (1 energy = 1 coin) =====
 local function startConversionLoop()
 	task.spawn(function()
 		while true do
@@ -64,18 +106,9 @@ local function startConversionLoop()
 					data.SiloEnergy -= converted
 					data.PendingCoins += converted
 
-					local plot = workspace:FindFirstChild("Plots") and workspace.Plots:FindFirstChild(tostring(player.UserId))
+					local plot = getPlayerPlot(player)
 					if plot then
-						local board = plot:FindFirstChild("ConversionBoard", true)
-						if board and board:FindFirstChild("SurfaceGui") then
-							local label = board.SurfaceGui:FindFirstChild("Label")
-							if label then
-								label.Text = string.format(
-									"Silo: %d\nPending Coins: %d\nRate: %.1f/s",
-									data.SiloEnergy, data.PendingCoins, rate
-								)
-							end
-						end
+						updateBoard(plot, data)
 					end
 				end
 			end
@@ -103,6 +136,7 @@ local function setupCoinVault(plot: Instance)
 		data.PendingCoins = 0
 
 		Remotes.StatsUpdate:FireClient(player, { Coins = data.Coins, PendingCoins = 0 })
+		updateBoard(plot, data)
 
 		task.delay(1, function()
 			onCooldown[player] = nil
@@ -129,6 +163,11 @@ Remotes.UpgradeConversion.OnServerEvent:Connect(function(player)
 	data.Coins -= cost
 	data.ConversionLevel += 1
 	Remotes.UpgradeConversion:FireClient(player, true, data.ConversionLevel)
+
+	local plot = getPlayerPlot(player)
+	if plot then
+		updateBoard(plot, data)
+	end
 end)
 
 -- ===== Init: wire up every plot in the workspace =====
