@@ -30,15 +30,72 @@ local function getPlayerPlot(player: Player)
 	return nil
 end
 
-local function getNextSlot(plot: Instance)
-	local slotsFolder = plot:FindFirstChild("BrainrotSlots")
-	if not slotsFolder then return nil end
-	for _, slot in ipairs(slotsFolder:GetChildren()) do
-		if slot:GetAttribute("Occupied") ~= true then
-			return slot
+-- Studs between each stacked "row" once every physical BrainrotSlots part already has one
+-- brainrot on it -- tweak to taste once you see it against your actual slot/model sizes.
+local STACK_LAYER_HEIGHT = 4
+
+-- Occupancy is derived live from what's actually parented to the slot (each brainrot model
+-- is parented directly to the slot it's sitting on), so there's no separate "Occupied" flag
+-- to fall out of sync with reality.
+local function countOccupants(slot: Instance): number
+	local count = 0
+	for _, child in ipairs(slot:GetChildren()) do
+		if child:GetAttribute("BrainrotId") ~= nil then
+			count += 1
 		end
 	end
-	return nil
+	return count
+end
+
+-- Returns the next open (slot, layer) pair. Fills layer 0 across every physical BrainrotSlots
+-- part first, then starts stacking layer 1 above them once all base slots are full, and so on --
+-- forms a 2D grid once a player owns more brainrots than there are physical slots for.
+local function getNextSlot(plot: Instance): (Instance?, number?)
+	local slotsFolder = plot:FindFirstChild("BrainrotSlots")
+	if not slotsFolder then return nil, nil end
+
+	local slots = slotsFolder:GetChildren()
+	if #slots == 0 then return nil, nil end
+
+	local maxLayers = math.ceil(GameConfig.MaxBrainrotsPerPlot / #slots)
+
+	for layer = 0, maxLayers - 1 do
+		for _, slot in ipairs(slots) do
+			if countOccupants(slot) == layer then
+				return slot, layer
+			end
+		end
+	end
+
+	return nil, nil
+end
+
+local function slotCFrame(slot: Instance, layer: number): CFrame
+	return slot.CFrame + Vector3.new(0, layer * STACK_LAYER_HEIGHT, 0)
+end
+
+-- Tints every part of a (placeholder) brainrot model by its tier so identical placeholder
+-- blocks are still visually distinguishable.
+local function colorModelByTier(model: Model, brainrotName: string)
+	local config = GameConfig.Brainrots[brainrotName]
+	local color = config and GameConfig.TierColors[config.Tier]
+	if not color then return end
+
+	for _, part in ipairs(model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.Color = color
+		end
+	end
+end
+
+-- Stacked brainrots sit mid-air above other slots once layer > 0, so they need to be
+-- anchored or they'd just fall through/off the slot below them.
+local function anchorModel(model: Model)
+	for _, part in ipairs(model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+		end
+	end
 end
 
 local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotName: string, plot: Instance)
@@ -128,38 +185,35 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 		return false, "Not enough room on plot"
 	end
 
-	-- Reserve all the slots we need up front (marking them Occupied immediately so a second
-	-- call to getNextSlot doesn't hand out the same slot twice), rolling back if we run out.
-	local reservedSlots = {}
-	for _ = 1, quantity do
-		local slot = getNextSlot(plot)
-		if not slot then
-			for _, reserved in ipairs(reservedSlots) do
-				reserved:SetAttribute("Occupied", false)
-			end
-			return false, "No free slot on plot"
-		end
-		slot:SetAttribute("Occupied", true)
-		table.insert(reservedSlots, slot)
+	-- Cheap up-front feasibility check (also catches a missing/empty BrainrotSlots folder)
+	-- before we touch coins or data. The real per-unit lookup happens in the loop below,
+	-- since occupancy changes as each model gets parented.
+	if not getNextSlot(plot) then
+		return false, "No free slot on plot"
 	end
 
 	data.Coins -= totalPrice
 
 	local template = BrainrotModelsFolder:FindFirstChild(brainrotName)
-	for _, slot in ipairs(reservedSlots) do
+	for _ = 1, quantity do
 		local brainrotId = HttpService:GenerateGUID(false)
 		table.insert(data.OwnedBrainrots, { Name = brainrotName, Id = brainrotId })
 
 		if template then
-			local model = template:Clone()
-			model:SetAttribute("BrainrotId", brainrotId)
-			model:SetAttribute("OwnerUserId", player.UserId)
-			if model.PrimaryPart then
-				model:SetPrimaryPartCFrame(slot.CFrame)
-			end
-			model.Parent = plot
+			local slot, layer = getNextSlot(plot)
+			if slot then
+				local model = template:Clone()
+				model:SetAttribute("BrainrotId", brainrotId)
+				model:SetAttribute("OwnerUserId", player.UserId)
+				colorModelByTier(model, brainrotName)
+				anchorModel(model)
+				if model.PrimaryPart then
+					model:SetPrimaryPartCFrame(slotCFrame(slot, layer :: number))
+				end
+				model.Parent = slot
 
-			startEnergyLoop(player, model, brainrotName, plot)
+				startEnergyLoop(player, model, brainrotName, plot)
+			end
 		end
 	end
 
@@ -174,4 +228,6 @@ end)
 return {
 	StartEnergyLoop = startEnergyLoop,
 	BuyBrainrot = buyBrainrot,
+	ColorModelByTier = colorModelByTier,
+	AnchorModel = anchorModel,
 }

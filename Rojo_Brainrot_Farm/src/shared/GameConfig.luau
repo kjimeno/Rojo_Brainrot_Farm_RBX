@@ -47,6 +47,16 @@ GameConfig.BrainrotOrder = {
 	"Tralalero", "TrippiTroppi", "BombardiroCrocodilo", "CappuccinoAssassino", "TungTungSahur",
 }
 
+-- Placeholder-model tint per tier, so identical placeholder blocks are still visually
+-- distinguishable at a glance until you swap in real models.
+GameConfig.TierColors = {
+	[1] = Color3.fromRGB(85, 255, 127),  -- green
+	[2] = Color3.fromRGB(85, 170, 255),  -- blue
+	[3] = Color3.fromRGB(255, 170, 0),   -- orange
+	[4] = Color3.fromRGB(255, 85, 255),  -- magenta
+	[5] = Color3.fromRGB(255, 60, 60),   -- red
+}
+
 -- How many of the same tier are needed to merge into the next tier
 GameConfig.MergeRequirement = 3
 
