@@ -107,50 +107,67 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 	end)
 end
 
-local function buyBrainrot(player: Player, brainrotName: string)
+local function buyBrainrot(player: Player, brainrotName: string, quantity: number?)
+	quantity = quantity or 1
+
 	local config = GameConfig.Brainrots[brainrotName]
 	if not config then return false, "Invalid brainrot" end
 
 	local data = PlayerDataManager.Get(player)
 	if not data then return false, "Data not loaded" end
 
-	if data.Coins < config.Price then
+	local totalPrice = config.Price * quantity
+	if data.Coins < totalPrice then
 		return false, "Not enough coins"
 	end
 
 	local plot = getPlayerPlot(player)
 	if not plot then return false, "No plot assigned" end
 
-	if #data.OwnedBrainrots >= GameConfig.MaxBrainrotsPerPlot then
-		return false, "Plot is full"
+	if #data.OwnedBrainrots + quantity > GameConfig.MaxBrainrotsPerPlot then
+		return false, "Not enough room on plot"
 	end
 
-	local slot = getNextSlot(plot)
-	if not slot then return false, "No free slot on plot" end
+	-- Reserve all the slots we need up front (marking them Occupied immediately so a second
+	-- call to getNextSlot doesn't hand out the same slot twice), rolling back if we run out.
+	local reservedSlots = {}
+	for _ = 1, quantity do
+		local slot = getNextSlot(plot)
+		if not slot then
+			for _, reserved in ipairs(reservedSlots) do
+				reserved:SetAttribute("Occupied", false)
+			end
+			return false, "No free slot on plot"
+		end
+		slot:SetAttribute("Occupied", true)
+		table.insert(reservedSlots, slot)
+	end
 
-	data.Coins -= config.Price
-	local brainrotId = HttpService:GenerateGUID(false)
-	table.insert(data.OwnedBrainrots, { Name = brainrotName, Id = brainrotId })
+	data.Coins -= totalPrice
 
 	local template = BrainrotModelsFolder:FindFirstChild(brainrotName)
-	if template then
-		local model = template:Clone()
-		model:SetAttribute("BrainrotId", brainrotId)
-		model:SetAttribute("OwnerUserId", player.UserId)
-		if model.PrimaryPart then
-			model:SetPrimaryPartCFrame(slot.CFrame)
-		end
-		model.Parent = plot
-		slot:SetAttribute("Occupied", true)
+	for _, slot in ipairs(reservedSlots) do
+		local brainrotId = HttpService:GenerateGUID(false)
+		table.insert(data.OwnedBrainrots, { Name = brainrotName, Id = brainrotId })
 
-		startEnergyLoop(player, model, brainrotName, plot)
+		if template then
+			local model = template:Clone()
+			model:SetAttribute("BrainrotId", brainrotId)
+			model:SetAttribute("OwnerUserId", player.UserId)
+			if model.PrimaryPart then
+				model:SetPrimaryPartCFrame(slot.CFrame)
+			end
+			model.Parent = plot
+
+			startEnergyLoop(player, model, brainrotName, plot)
+		end
 	end
 
 	return true, data.Coins
 end
 
-Remotes.BuyBrainrot.OnServerEvent:Connect(function(player, brainrotName)
-	local success, resultOrError = buyBrainrot(player, brainrotName)
+Remotes.BuyBrainrot.OnServerEvent:Connect(function(player, brainrotName, quantity)
+	local success, resultOrError = buyBrainrot(player, brainrotName, quantity)
 	Remotes.BuyBrainrot:FireClient(player, success, resultOrError)
 end)
 
