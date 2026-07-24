@@ -108,6 +108,31 @@ local function anchorModel(model: Model)
 	end
 end
 
+-- Small floating "Name / Tier N" text above a spawned brainrot placeholder.
+local function addNameplate(model: Model, brainrotName: string)
+	local config = GameConfig.Brainrots[brainrotName]
+	if not config or not model.PrimaryPart then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "Nameplate"
+	billboard.Adornee = model.PrimaryPart
+	billboard.Size = UDim2.new(0, 110, 0, 32)
+	billboard.StudsOffset = Vector3.new(0, 2, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = model.PrimaryPart
+
+	local label = Instance.new("TextLabel")
+	label.Name = "NameplateLabel"
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextStrokeTransparency = 0.5
+	label.Text = string.format("%s\nTier %d", brainrotName, config.Tier)
+	label.Parent = billboard
+end
+
 local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotName: string, plot: Instance)
 	local config = GameConfig.Brainrots[brainrotName]
 	if not config then return end
@@ -221,6 +246,7 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 					model:SetPrimaryPartCFrame(slotCFrame(slot, layer :: number))
 				end
 				model.Parent = slot
+				addNameplate(model, brainrotName)
 
 				startEnergyLoop(player, model, brainrotName, plot)
 			end
@@ -274,6 +300,7 @@ local function repackPlot(player: Player, plot: Instance, data)
 				model:SetPrimaryPartCFrame(slotCFrame(slot, layer))
 			end
 			model.Parent = slot
+			addNameplate(model, entry.Name)
 
 			startEnergyLoop(player, model, entry.Name, plot)
 		end
