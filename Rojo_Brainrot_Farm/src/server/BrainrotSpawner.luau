@@ -230,6 +230,10 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 	data.Coins -= totalPrice
 
 	local template = BrainrotModelsFolder:FindFirstChild(brainrotName)
+	if not template then
+		warn(("[BrainrotSpawner] No ServerStorage/BrainrotModels/%s found -- %s will be tracked in data but won't visually spawn, and its slot will look free to future purchases/merges"):format(brainrotName, brainrotName))
+	end
+
 	for _ = 1, quantity do
 		local brainrotId = HttpService:GenerateGUID(false)
 		table.insert(data.OwnedBrainrots, { Name = brainrotName, Id = brainrotId })
@@ -284,9 +288,15 @@ local function repackPlot(player: Player, plot: Instance, data)
 		return tierA > tierB
 	end)
 
+	local warnedMissing = {}
 	local numSlots = #slots
 	for index, entry in ipairs(sortedEntries) do
 		local template = BrainrotModelsFolder:FindFirstChild(entry.Name)
+		if not template and not warnedMissing[entry.Name] then
+			warnedMissing[entry.Name] = true
+			warn(("[BrainrotSpawner] No ServerStorage/BrainrotModels/%s found -- it won't visually spawn during repack, and its slot will look free to future purchases/merges"):format(entry.Name))
+		end
+
 		if template then
 			local slot = slots[((index - 1) % numSlots) + 1]
 			local layer = math.floor((index - 1) / numSlots)
