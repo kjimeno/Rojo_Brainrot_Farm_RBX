@@ -141,7 +141,7 @@ GameConfig.BaseConversionRate = 1
 GameConfig.ConversionUpgrade = {
 	MaxLevel = 20,
 	BaseCost = 1,
-	CostGrowth = 1.4,
+	CostGrowth = 1.05,
 	RatePerLevel = 0.75,
 }
 
