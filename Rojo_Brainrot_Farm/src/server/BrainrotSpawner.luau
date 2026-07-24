@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -57,6 +58,28 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			energyPart.CFrame = conveyorStart.CFrame + Vector3.new(0, 2, 0)
 			energyPart.Parent = workspace
 
+			-- Player must physically walk into the energy part to collect it.
+			-- Only the owner of the brainrot that produced it can collect it (no stealing, for now).
+			local collected = false
+			local touchConnection
+			touchConnection = energyPart.Touched:Connect(function(hit)
+				if collected then return end
+
+				local character = hit.Parent
+				local touchingPlayer = Players:GetPlayerFromCharacter(character)
+				if not touchingPlayer or touchingPlayer.UserId ~= player.UserId then return end
+
+				collected = true
+				local data = PlayerDataManager.Get(touchingPlayer)
+				if data then
+					data.StoredEnergy += config.EnergyPerDrop
+					Remotes.StatsUpdate:FireClient(touchingPlayer, { StoredEnergy = data.StoredEnergy })
+				end
+
+				if touchConnection then touchConnection:Disconnect() end
+				energyPart:Destroy()
+			end)
+
 			local conveyorEnd = plot:FindFirstChild("ConveyorEnd")
 			if conveyorEnd then
 				local tween = TweenService:Create(
@@ -65,6 +88,20 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 					{ CFrame = conveyorEnd.CFrame + Vector3.new(0, 2, 0) }
 				)
 				tween:Play()
+
+				tween.Completed:Connect(function()
+					-- Give the player a grace window to walk over and grab it once it reaches
+					-- the end of the belt, then despawn it if it's never collected so parts
+					-- don't pile up forever.
+					task.wait(10)
+					if touchConnection then touchConnection:Disconnect() end
+					if energyPart.Parent and not collected then
+						energyPart:Destroy()
+					end
+				end)
+			else
+				if touchConnection then touchConnection:Disconnect() end
+				energyPart:Destroy() -- no conveyor end configured, don't leave orphan parts around
 			end
 		end
 	end)

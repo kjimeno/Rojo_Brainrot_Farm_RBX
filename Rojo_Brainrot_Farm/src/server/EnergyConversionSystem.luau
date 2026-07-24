@@ -10,33 +10,11 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 
--- ===== 1. Collecting energy at the end of the conveyor =====
-local function setupCollector(plot: Instance)
-	local collector = plot:FindFirstChild("Collector")
-	if not collector then return end
-
-	collector.Touched:Connect(function(hit)
-		local ownerUserId = hit:GetAttribute("OwnerUserId")
-		if not ownerUserId then return end
-
-		local energyValue = hit:GetAttribute("EnergyValue")
-		if not energyValue then return end
-
-		local player = Players:GetPlayerByUserId(ownerUserId)
-		if not player then return end
-
-		local data = PlayerDataManager.Get(player)
-		if not data then return end
-
-		data.StoredEnergy += energyValue
-		hit:Destroy()
-
-		Remotes.StatsUpdate:FireClient(player, {
-			StoredEnergy = data.StoredEnergy,
-			Coins = data.Coins,
-		})
-	end)
-end
+-- ===== 1. Energy collection =====
+-- Handled in BrainrotSpawner.luau via Tween.Completed instead of a Touched listener here —
+-- Touched never fires between two Anchored parts, and both the energy part and the Collector
+-- part are Anchored, so a Touched-based approach on this part would silently never trigger.
+-- Kept the Collector part itself in your plot for visual/positional reference only.
 
 -- ===== 2. Depositing carried energy into the silo =====
 local function setupDepositArea(plot: Instance)
@@ -161,7 +139,6 @@ local function initAllPlots()
 		return
 	end
 	for _, plot in ipairs(plotsFolder:GetChildren()) do
-		setupCollector(plot)
 		setupDepositArea(plot)
 		setupCoinVault(plot)
 	end
