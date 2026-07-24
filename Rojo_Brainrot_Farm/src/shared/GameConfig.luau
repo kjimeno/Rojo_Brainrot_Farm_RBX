@@ -8,35 +8,35 @@ local GameConfig = {}
 GameConfig.Brainrots = {
 	["Tralalero"] = {
 		Tier = 1,
-		Price = 100,
+		Price = 5,
 		EnergyPerDrop = 1,
 		DropInterval = 3,
 		MergeInto = "TrippiTroppi",
 	},
 	["TrippiTroppi"] = {
 		Tier = 2,
-		Price = 500,
+		Price = 25,
 		EnergyPerDrop = 3,
 		DropInterval = 3,
 		MergeInto = "BombardiroCrocodilo",
 	},
 	["BombardiroCrocodilo"] = {
 		Tier = 3,
-		Price = 2500,
+		Price = 125,
 		EnergyPerDrop = 8,
 		DropInterval = 3,
 		MergeInto = "CappuccinoAssassino",
 	},
 	["CappuccinoAssassino"] = {
 		Tier = 4,
-		Price = 12000,
+		Price = 625,
 		EnergyPerDrop = 20,
 		DropInterval = 3,
 		MergeInto = "TungTungSahur",
 	},
 	["TungTungSahur"] = {
 		Tier = 5,
-		Price = 60000,
+		Price = 3125,
 		EnergyPerDrop = 50,
 		DropInterval = 3,
 		MergeInto = nil, -- max tier for now
