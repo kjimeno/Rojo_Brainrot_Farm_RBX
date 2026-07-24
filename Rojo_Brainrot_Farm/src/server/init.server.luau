@@ -65,5 +65,6 @@ PlayerDataManager.StartAutosave(60)
 require(script.BrainrotSpawner)
 require(script.EnergyConversionSystem)
 require(script.MergeSystem)
+require(script.ShopPrompts)
 
 print("[Server] Brainrot Tycoon systems initialized.")
