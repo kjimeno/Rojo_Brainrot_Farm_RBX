@@ -30,12 +30,32 @@ energyLabel.TextScaled = true
 energyLabel.Text = "Energy: 0"
 energyLabel.Parent = screenGui
 
+-- ===== Bottom-left coin counter =====
+local coinsLabel = Instance.new("TextLabel")
+coinsLabel.Name = "CoinsLabel"
+coinsLabel.AnchorPoint = Vector2.new(0, 1)
+coinsLabel.Position = UDim2.new(0, 20, 1, -20)
+coinsLabel.Size = UDim2.new(0, 220, 0, 40)
+coinsLabel.BackgroundTransparency = 0.4
+coinsLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+coinsLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+coinsLabel.Font = Enum.Font.GothamBold
+coinsLabel.TextScaled = true
+coinsLabel.Text = "Coins: 0"
+coinsLabel.Parent = screenGui
+
 local storedEnergy = 0
+local coins = 0
 
 Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 	if stats.StoredEnergy ~= nil then
 		storedEnergy = stats.StoredEnergy
 		energyLabel.Text = ("Energy: %d"):format(storedEnergy)
+	end
+
+	if stats.Coins ~= nil then
+		coins = stats.Coins
+		coinsLabel.Text = ("Coins: %d"):format(coins)
 	end
 end)
 
