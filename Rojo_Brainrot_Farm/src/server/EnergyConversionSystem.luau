@@ -55,6 +55,49 @@ local function updateBoard(plot: Instance, data)
 		"Silo: %d\nPending Coins: %d\nRate: %.1f/s",
 		data.SiloEnergy, data.PendingCoins, rate
 	)
+
+	local vault = plot:FindFirstChild("CoinVault")
+	local billboard = vault and vault:FindFirstChild("CoinVaultBillboard")
+	local amountLabel = billboard and billboard:FindFirstChild("AmountLabel")
+	if amountLabel then
+		amountLabel.Text = tostring(data.PendingCoins)
+	end
+end
+
+-- Creates the floating "Collect Coins" / amount text above the gold CoinVault platform,
+-- if it doesn't already exist (safe to call every server start without duplicating it).
+local function ensureCoinVaultBillboard(vault: Instance)
+	if vault:FindFirstChild("CoinVaultBillboard") then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CoinVaultBillboard"
+	billboard.Adornee = vault
+	billboard.Size = UDim2.new(0, 200, 0, 80)
+	billboard.StudsOffset = Vector3.new(0, 5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = vault
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "TitleLabel"
+	titleLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	titleLabel.Position = UDim2.new(0, 0, 0, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextScaled = true
+	titleLabel.TextColor3 = Color3.new(1, 1, 1)
+	titleLabel.Text = "Collect Coins"
+	titleLabel.Parent = billboard
+
+	local amountLabel = Instance.new("TextLabel")
+	amountLabel.Name = "AmountLabel"
+	amountLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	amountLabel.Position = UDim2.new(0, 0, 0.5, 0)
+	amountLabel.BackgroundTransparency = 1
+	amountLabel.Font = Enum.Font.GothamBold
+	amountLabel.TextScaled = true
+	amountLabel.TextColor3 = Color3.new(1, 1, 1)
+	amountLabel.Text = "0"
+	amountLabel.Parent = billboard
 end
 
 -- ===== 2. Depositing carried energy into the silo =====
@@ -120,6 +163,8 @@ end
 local function setupCoinVault(plot: Instance)
 	local vault = plot:FindFirstChild("CoinVault")
 	if not vault then return end
+
+	ensureCoinVaultBillboard(vault)
 
 	local onCooldown = {}
 
