@@ -141,24 +141,37 @@ GameConfig.BaseConversionRate = 1
 GameConfig.ConversionUpgrade = {
 	MaxLevel = 20,
 	BaseCost = 1,
-	CostGrowth = 1.05,
-	RatePerLevel = 0.75,
+	CostGrowth = 1.4,     -- each purchase costs 1.4x the previous one
+	RatePerLevel = 0.75,  -- how much the FIRST purchase adds to your rate
+	RateGrowth = 1.4,     -- each purchase's rate increase is 1.4x the previous purchase's increase
 }
 
 function GameConfig.GetUpgradeCost(currentLevel: number): number
 	return math.floor(GameConfig.ConversionUpgrade.BaseCost * (GameConfig.ConversionUpgrade.CostGrowth ^ currentLevel))
 end
 
+-- How much rate your NEXT purchase (going from currentLevel to currentLevel + 1) adds --
+-- itself growing by RateGrowth each time, not a flat amount.
+function GameConfig.GetNextRateIncrease(currentLevel: number): number
+	return GameConfig.ConversionUpgrade.RatePerLevel * (GameConfig.ConversionUpgrade.RateGrowth ^ currentLevel)
+end
+
+-- Sum of every purchase's increase so far (a geometric series), plus the base rate.
 function GameConfig.GetConversionRate(level: number): number
-	return GameConfig.BaseConversionRate + (level * GameConfig.ConversionUpgrade.RatePerLevel)
+	local upgrade = GameConfig.ConversionUpgrade
+	if level <= 0 then
+		return GameConfig.BaseConversionRate
+	end
+	local totalIncrease = upgrade.RatePerLevel * (upgrade.RateGrowth ^ level - 1) / (upgrade.RateGrowth - 1)
+	return GameConfig.BaseConversionRate + totalIncrease
 end
 
 -- ============ PLOT / CONVEYOR ============
--- 9 columns x 3 rows. BrainrotSpawner derives the grid shape from however many physical
+-- 9 columns x 4 rows. BrainrotSpawner derives the grid shape from however many physical
 -- BrainrotSlots parts a plot actually has (that's the column count) and this total, so for
--- this to come out as exactly 9x3 each plot needs exactly 9 BrainrotSlots parts built in
--- Studio (see studio-tools/BuildBrainrotGrid.luau) -- ceil(27 / 9) = 3 layers.
-GameConfig.MaxBrainrotsPerPlot = 27
+-- this to come out as exactly 9x4 each plot needs exactly 9 BrainrotSlots parts built in
+-- Studio (see studio-tools/BuildBrainrotGrid.luau) -- ceil(36 / 9) = 4 layers.
+GameConfig.MaxBrainrotsPerPlot = 36
 GameConfig.ConveyorTravelTime = 4
 
 return GameConfig

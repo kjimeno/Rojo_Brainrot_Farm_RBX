@@ -6,8 +6,8 @@
 --
 -- BrainrotSpawner derives the grid's column count from however many physical BrainrotSlots
 -- parts a plot has, and the row count from GameConfig.MaxBrainrotsPerPlot / columns (rounded
--- up). GameConfig.MaxBrainrotsPerPlot is now 27, so for the grid to come out as exactly
--- 9 columns x 3 rows, each plot needs EXACTLY 9 BrainrotSlots parts. This script rebuilds
+-- up). GameConfig.MaxBrainrotsPerPlot is now 36, so for the grid to come out as exactly
+-- 9 columns x 4 rows, each plot needs EXACTLY 9 BrainrotSlots parts. This script rebuilds
 -- each plot's BrainrotSlots folder to have exactly that many, evenly spaced, using your
 -- first existing slot as the template (size/material/etc.) and inferring spacing from your
 -- first two existing slots if there are at least two.
@@ -15,7 +15,7 @@
 -- WARNING: this destroys your plots' existing BrainrotSlots parts (and any brainrot models
 -- currently sitting on them) and replaces them with 9 fresh ones. Player data isn't touched --
 -- only the visuals -- so the next merge or purchase will redraw everything correctly at the
--- new 9x3 layout. If you have brainrots you want to see again without buying/merging, trigger
+-- new 9x4 layout. If you have brainrots you want to see again without buying/merging, trigger
 -- a purchase or merge once after running this to force a repack.
 
 local Workspace = game:GetService("Workspace")

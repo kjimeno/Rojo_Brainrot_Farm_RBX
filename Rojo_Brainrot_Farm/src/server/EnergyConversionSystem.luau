@@ -69,12 +69,20 @@ local function updateBoard(plot: Instance, data)
 	local upgradePlatform = plot:FindFirstChild("UpgradePlatform")
 	if upgradePlatform then
 		local upgradeBillboard = upgradePlatform:FindFirstChild("UpgradeBillboard")
+		local rateLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("RateLabel")
 		local costLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("CostLabel")
 
 		if data.ConversionLevel >= GameConfig.ConversionUpgrade.MaxLevel then
-			if costLabel then costLabel.Text = "MAX LEVEL" end
+			if rateLabel then rateLabel.Text = "MAX" end
+			if costLabel then costLabel.Text = "LEVEL" end
 			upgradePlatform.Color = Color3.new(1, 1, 1)
 		else
+			-- Both the rate increase AND the cost grow with each purchase (RateGrowth / CostGrowth
+			-- respectively), so both lines have to be recomputed from the player's current level
+			-- every time, not baked in once when the billboard was first created.
+			if rateLabel then
+				rateLabel.Text = ("+%.2f/s"):format(GameConfig.GetNextRateIncrease(data.ConversionLevel))
+			end
 			local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
 			if costLabel then costLabel.Text = ("%d gold"):format(cost) end
 			upgradePlatform.Color = (data.Coins >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
@@ -118,10 +126,10 @@ local function ensureCoinVaultBillboard(vault: Instance)
 	amountLabel.Parent = billboard
 end
 
--- Creates the floating "+0.75/s" / cost text above the UpgradePlatform, if it doesn't
--- already exist (safe to call every server start without duplicating it). The rate line is
--- static (every level always adds the same RatePerLevel), the cost line gets refreshed by
--- updateBoard since it depends on the plot owner's current ConversionLevel.
+-- Creates the floating "+rate/s" / cost text above the UpgradePlatform, if it doesn't already
+-- exist (safe to call every server start without duplicating it). Both lines start out showing
+-- the level-0 values as a placeholder; updateBoard refreshes both every time, since both the
+-- rate increase and the cost grow with the plot owner's current ConversionLevel.
 local function ensureUpgradeBillboard(platform: Instance)
 	if platform:FindFirstChild("UpgradeBillboard") then return end
 
@@ -216,15 +224,20 @@ local function startConversionLoop()
 			for _, player in ipairs(Players:GetPlayers()) do
 				local data = PlayerDataManager.Get(player)
 				if data and data.SiloEnergy > 0 then
+					-- GetConversionRate can be fractional (RateGrowth compounds per upgrade), so
+					-- floor to a whole number here -- otherwise SiloEnergy/PendingCoins would pick
+					-- up fractional remainders and the coins to collect would show decimals.
 					local rate = GameConfig.GetConversionRate(data.ConversionLevel)
-					local converted = math.min(rate, data.SiloEnergy)
+					local converted = math.floor(math.min(rate, data.SiloEnergy))
 
-					data.SiloEnergy -= converted
-					data.PendingCoins += converted
+					if converted > 0 then
+						data.SiloEnergy -= converted
+						data.PendingCoins += converted
 
-					local plot = getPlayerPlot(player)
-					if plot then
-						updateBoard(plot, data)
+						local plot = getPlayerPlot(player)
+						if plot then
+							updateBoard(plot, data)
+						end
 					end
 				end
 			end
