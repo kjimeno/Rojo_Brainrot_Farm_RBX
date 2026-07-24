@@ -66,7 +66,7 @@ GameConfig.MaxSiloCapacity = 500
 
 GameConfig.ConversionUpgrade = {
 	MaxLevel = 20,
-	BaseCost = 750,
+	BaseCost = 1,
 	CostGrowth = 1.4,
 	RatePerLevel = 0.75,
 }
