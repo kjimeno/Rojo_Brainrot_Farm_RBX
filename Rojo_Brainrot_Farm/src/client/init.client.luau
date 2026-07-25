@@ -103,6 +103,11 @@ Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 	end
 end)
 
+-- Ask the server for our actual loaded stats now that we're listening for the reply above --
+-- without this, everything just sits at these scripts' own built-in defaults (Energy: 0,
+-- Cash: 0, etc.) until some other action (buying, depositing, ...) happens to push an update.
+Remotes.RequestStats:FireServer()
+
 -- Example client-side call (wire this to a real button later):
 -- Remotes.BuyBrainrot:FireServer("Tralalero")
 
