@@ -31,10 +31,14 @@ local function getPlayerPlot(player: Player)
 	return nil
 end
 
--- Refreshes the physical SurfaceGui board on the player's plot (built manually in Studio as
--- <plot>/ConversionBoard/Board/SurfaceGui/Label) to reflect their current silo/coin numbers.
--- Searches recursively for the SurfaceGui/Label since they live on a child part ("Board")
--- inside the ConversionBoard model, not on the model itself.
+-- Refreshes the physical SurfaceGui board on the player's plot (built manually in Studio
+-- somewhere under <plot>/ConversionBoard) to reflect current silo/rate numbers. Three
+-- separate TextLabels, found recursively since their exact nesting depends on your board's
+-- own model structure:
+--   TitleLabel  -- static "Converting Energy" heading
+--   EnergyLabel -- how much SiloEnergy is left to convert
+--   RateLabel   -- the conversion rate, "X per second"
+-- Only .Text is ever touched -- color each one however you want in Studio and it'll stick.
 local function updateBoard(plot: Instance, data)
 	local board = plot:FindFirstChild("ConversionBoard", true)
 	if not board then
@@ -48,17 +52,26 @@ local function updateBoard(plot: Instance, data)
 		return
 	end
 
-	local label = surfaceGui:FindFirstChild("Label", true) or surfaceGui:FindFirstChildWhichIsA("TextLabel", true)
-	if not label then
-		warn("[EnergyConversionSystem] SurfaceGui on " .. plot.Name .. "'s ConversionBoard has no Label/TextLabel")
-		return
+	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
+
+	local boardTitleLabel = surfaceGui:FindFirstChild("TitleLabel", true)
+	if boardTitleLabel then
+		boardTitleLabel.Text = (data.SiloEnergy > 0) and "Converting Energy" or "No Energy"
 	end
 
-	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
-	label.Text = string.format(
-		"Silo: %d\nPending Cash: %d\nRate: %.1f/s",
-		data.SiloEnergy, data.PendingCash, rate
-	)
+	local boardEnergyLabel = surfaceGui:FindFirstChild("EnergyLabel", true)
+	if boardEnergyLabel then
+		boardEnergyLabel.Text = tostring(data.SiloEnergy)
+	else
+		warn("[EnergyConversionSystem] ConversionBoard on " .. plot.Name .. " has no EnergyLabel")
+	end
+
+	local boardRateLabel = surfaceGui:FindFirstChild("RateLabel", true)
+	if boardRateLabel then
+		boardRateLabel.Text = ("%.1f per Second"):format(rate)
+	else
+		warn("[EnergyConversionSystem] ConversionBoard on " .. plot.Name .. " has no RateLabel")
+	end
 
 	local vault = plot:FindFirstChild("CoinVault")
 	local cashBillboard = vault and vault:FindFirstChild("CashVaultBillboard")
