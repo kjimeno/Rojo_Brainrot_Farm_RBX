@@ -69,7 +69,7 @@ end
 -- Where each energy drop spawns relative to the brainrot that produced it: this many studs
 -- out in front of it (along whichever way its model is actually facing) and this many studs
 -- up. Tweak these two to taste once you see it against your model sizes.
-local ENERGY_DROP_DISTANCE = -3
+local ENERGY_DROP_DISTANCE = -5
 local ENERGY_DROP_HEIGHT = 2
 
 -- Occupancy is derived live from what's actually parented to the slot (each brainrot model
