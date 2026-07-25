@@ -64,7 +64,7 @@ local function updateBoard(plot: Instance, data)
 	local cashBillboard = vault and vault:FindFirstChild("CashVaultBillboard")
 	local amountLabel = cashBillboard and cashBillboard:FindFirstChild("AmountLabel")
 	if amountLabel then
-		amountLabel.Text = tostring(data.PendingCash)
+		amountLabel.Text = ("$%d"):format(data.PendingCash)
 	end
 
 	local upgradePlatform = plot:FindFirstChild("UpgradePlatform")
@@ -123,7 +123,7 @@ local function ensureCoinVaultBillboard(vault: Instance)
 	amountLabel.Font = Enum.Font.GothamBold
 	amountLabel.TextScaled = true
 	amountLabel.TextColor3 = Color3.new(1, 1, 1)
-	amountLabel.Text = "0"
+	amountLabel.Text = "$0"
 	amountLabel.Parent = billboard
 end
 
