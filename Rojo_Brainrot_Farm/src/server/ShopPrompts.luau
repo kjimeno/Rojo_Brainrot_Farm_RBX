@@ -1,15 +1,14 @@
 -- ShopPrompts.luau
 -- Lives at ServerScriptService.Server.ShopPrompts
--- Listens for ANY ProximityPrompt in the game that has a "BrainrotName" attribute set,
--- and treats triggering it as "buy this brainrot for this player."
--- This lets you build a shop stall entirely with placeholder Parts + ProximityPrompts —
--- no client UI or RemoteEvent wiring needed to test the buy flow.
+-- Listens for Touched on ANY Part in the game that has a "BrainrotName" attribute set, and
+-- treats stepping on it as "buy this brainrot for this player." This lets you build a shop
+-- stall entirely with placeholder Parts -- no ProximityPrompt or client UI wiring needed.
 --
--- Each platform is one Part with a ProximityPrompt child carrying attributes:
+-- Each platform is one Part carrying attributes directly on itself:
 --   BrainrotName = "Tralalero"   -- required
 --   Quantity     = 5             -- optional, defaults to 1 (e.g. the 1x/5x/25x/100x tier-1 stalls)
 
-local ProximityPromptService = game:GetService("ProximityPromptService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -19,11 +18,9 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local EnergyConversionSystem = require(script.Parent.EnergyConversionSystem)
 local MergeSystem = require(script.Parent.MergeSystem)
 
--- Floating "Buy 5x Tralalero / 25 cash" text above a shop platform (the Part the
--- ProximityPrompt is parented to). Created once per prompt, safe to re-run on server start.
-local function ensureShopBillboard(prompt: ProximityPrompt, brainrotName: string, quantity: number)
-	local platform = prompt.Parent
-	if not platform or not platform:IsA("BasePart") then return end
+-- Floating "Buy 5x Tralalero / 25 cash" text above a shop platform. Created once per
+-- platform, safe to re-run on server start.
+local function ensureShopBillboard(platform: BasePart, brainrotName: string, quantity: number)
 	if platform:FindFirstChild("ShopBillboard") then return end
 
 	local config = GameConfig.Brainrots[brainrotName]
@@ -60,37 +57,19 @@ local function ensureShopBillboard(prompt: ProximityPrompt, brainrotName: string
 	priceLabel.Parent = billboard
 end
 
--- Build the floating text for every shop prompt that already exists in the workspace
--- (the platforms themselves are built manually in Studio, same as the plots/board).
-for _, descendant in ipairs(workspace:GetDescendants()) do
-	if descendant:IsA("ProximityPrompt") then
-		local brainrotName = descendant:GetAttribute("BrainrotName")
-		if brainrotName then
-			local quantity = descendant:GetAttribute("Quantity") or 1
-			ensureShopBillboard(descendant, brainrotName, quantity)
-		end
-	end
-end
-
-ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-	local brainrotName = prompt:GetAttribute("BrainrotName")
-	if not brainrotName then return end -- not a shop prompt, ignore it
-
-	local quantity = prompt:GetAttribute("Quantity") or 1
+local function buyAt(platform: BasePart, player: Player, brainrotName: string, quantity: number)
 	local success, resultOrError = BrainrotSpawner.BuyBrainrot(player, brainrotName, quantity)
 
 	if success then
 		local data = PlayerDataManager.Get(player)
 		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash })
 
-		-- Spending cash here can change whether the player can afford their next
-		-- conversion upgrade, so refresh that sign's afford/can't-afford color too.
+		-- Spending cash here can change whether the player can afford their next conversion
+		-- upgrade, and buying can push a tier up to 3+ owned copies making a merge possible --
+		-- refresh both of those signs too.
 		local plot = EnergyConversionSystem.GetPlayerPlot(player)
 		if plot then
 			EnergyConversionSystem.UpdateBoard(plot, data)
-
-			-- Buying can push a tier up to 3+ owned copies, so the merge platform might have
-			-- just become ready -- refresh its yellow/grey state too.
 			MergeSystem.UpdateMergePlatform(plot, data)
 		end
 
@@ -99,6 +78,37 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		print(("[Shop] %s failed to buy %dx %s: %s"):format(player.Name, quantity, brainrotName, tostring(resultOrError)))
 		-- Once you build real UI, fire a dedicated remote here to show an error toast/sound.
 	end
-end)
+end
+
+local function setupShopPlatform(platform: BasePart)
+	local brainrotName = platform:GetAttribute("BrainrotName")
+	if not brainrotName then return end
+
+	local quantity = platform:GetAttribute("Quantity") or 1
+	ensureShopBillboard(platform, brainrotName, quantity)
+
+	local onCooldown = {}
+
+	platform.Touched:Connect(function(hit)
+		local character = hit.Parent
+		local player = Players:GetPlayerFromCharacter(character)
+		if not player or onCooldown[player] then return end
+
+		onCooldown[player] = true
+		buyAt(platform, player, brainrotName, quantity)
+
+		task.delay(1, function()
+			onCooldown[player] = nil
+		end)
+	end)
+end
+
+-- Wire up every shop platform that already exists in the workspace (the platforms themselves
+-- are built manually in Studio, same as the plots/board).
+for _, descendant in ipairs(workspace:GetDescendants()) do
+	if descendant:IsA("BasePart") and descendant:GetAttribute("BrainrotName") then
+		setupShopPlatform(descendant)
+	end
+end
 
 return true

@@ -3,12 +3,12 @@
 -- Studio Command Bar script, not part of the running game.
 --
 -- Paste this whole file into Studio's View > Command Bar and press Enter once.
--- It builds 4 SEPARATE small platforms under Workspace.Shop, each with its own
--- ProximityPrompt already tagged with the right BrainrotName/Quantity attributes,
--- replacing the single long block. Delete your old shared shop block first.
+-- It builds 4 SEPARATE small platforms under Workspace.Shop, each tagged directly with the
+-- right BrainrotName/Quantity attributes -- step on one to buy, no ProximityPrompt involved.
+-- Replaces the single long block. Delete your old shared shop block first.
 --
 -- After running it, restart your Play Test / rojo-served session so ShopPrompts.luau
--- (which scans for prompts once at server start) picks up the new platforms and
+-- (which scans for tagged platforms once at server start) picks up the new platforms and
 -- attaches their floating "Buy Nx / price" text.
 
 local Workspace = game:GetService("Workspace")
@@ -35,17 +35,9 @@ for i, quantity in ipairs(QUANTITIES) do
 	platform.Material = Enum.Material.Neon
 	platform.Color = Color3.fromRGB(170, 0, 255)
 	platform.Position = BASE_POSITION + Vector3.new((i - 1) * SPACING, 0, 0)
+	platform:SetAttribute("BrainrotName", "Tralalero")
+	platform:SetAttribute("Quantity", quantity)
 	platform.Parent = shopFolder
-
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "BuyPrompt"
-	prompt.ActionText = "Buy"
-	prompt.ObjectText = ("%dx Tralalero"):format(quantity)
-	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 10
-	prompt:SetAttribute("BrainrotName", "Tralalero")
-	prompt:SetAttribute("Quantity", quantity)
-	prompt.Parent = platform
 end
 
 print("[ShopBuilder] Built 4 separate Tier-1 shop platforms under Workspace.Shop")

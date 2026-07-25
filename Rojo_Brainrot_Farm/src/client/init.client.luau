@@ -52,8 +52,8 @@ local cash = 0
 -- color for everyone -- each client colors the platform Part itself against its OWN cash
 -- count here. Setting a property from a LocalScript only changes what this client sees, so
 -- this doesn't affect other players' view of the same platform.
-local AFFORD_COLOR = Color3.fromRGB(85, 255, 127)
-local CANT_AFFORD_COLOR = Color3.fromRGB(255, 60, 60)
+local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
+local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
 
 -- platform Part -> total price it represents
 local trackedShopPlatforms = {}
@@ -72,26 +72,23 @@ local function refreshAllShopPlatforms()
 	end
 end
 
-local function trackShopPrompt(prompt: Instance)
-	if not prompt:IsA("ProximityPrompt") then return end
-	local brainrotName = prompt:GetAttribute("BrainrotName")
+local function trackShopPlatform(instance: Instance)
+	if not instance:IsA("BasePart") then return end
+	local brainrotName = instance:GetAttribute("BrainrotName")
 	if not brainrotName then return end
 
 	local config = GameConfig.Brainrots[brainrotName]
 	if not config then return end
 
-	local platform = prompt.Parent
-	if not platform or not platform:IsA("BasePart") then return end
-
-	local quantity = prompt:GetAttribute("Quantity") or 1
-	trackedShopPlatforms[platform] = config.Price * quantity
-	colorShopPlatform(platform, config.Price * quantity)
+	local quantity = instance:GetAttribute("Quantity") or 1
+	trackedShopPlatforms[instance] = config.Price * quantity
+	colorShopPlatform(instance, config.Price * quantity)
 end
 
 for _, descendant in ipairs(workspace:GetDescendants()) do
-	trackShopPrompt(descendant)
+	trackShopPlatform(descendant)
 end
-workspace.DescendantAdded:Connect(trackShopPrompt)
+workspace.DescendantAdded:Connect(trackShopPlatform)
 
 Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 	if stats.StoredEnergy ~= nil then
