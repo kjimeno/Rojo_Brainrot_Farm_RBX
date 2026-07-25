@@ -41,7 +41,7 @@ cashLabel.BackgroundColor3 = Color3.new(0, 0, 0)
 cashLabel.TextColor3 = Color3.fromRGB(60, 200, 100)
 cashLabel.Font = Enum.Font.GothamBold
 cashLabel.TextScaled = true
-cashLabel.Text = "Cash: 0"
+cashLabel.Text = "$0"
 cashLabel.Parent = screenGui
 
 local storedEnergy = 0
@@ -98,7 +98,7 @@ Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 
 	if stats.Cash ~= nil then
 		cash = stats.Cash
-		cashLabel.Text = ("Cash: %d"):format(cash)
+		cashLabel.Text = ("$%d"):format(cash)
 		refreshAllShopPlatforms()
 	end
 end)
