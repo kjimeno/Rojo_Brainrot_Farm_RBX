@@ -17,6 +17,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local EnergyConversionSystem = require(script.Parent.EnergyConversionSystem)
+local MergeSystem = require(script.Parent.MergeSystem)
 
 -- Floating "Buy 5x Tralalero / 25 cash" text above a shop platform (the Part the
 -- ProximityPrompt is parented to). Created once per prompt, safe to re-run on server start.
@@ -87,6 +88,10 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		local plot = EnergyConversionSystem.GetPlayerPlot(player)
 		if plot then
 			EnergyConversionSystem.UpdateBoard(plot, data)
+
+			-- Buying can push a tier up to 3+ owned copies, so the merge platform might have
+			-- just become ready -- refresh its yellow/grey state too.
+			MergeSystem.UpdateMergePlatform(plot, data)
 		end
 
 		print(("[Shop] %s bought %dx %s. Cash left: %d"):format(player.Name, quantity, brainrotName, data.Cash))

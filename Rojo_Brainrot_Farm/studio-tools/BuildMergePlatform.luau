@@ -8,10 +8,9 @@
 -- CoinVault/DepositArea so it lands somewhere reasonable — nudge it afterward
 -- if it's not exactly where you want it.
 --
--- No attributes are set on it: MergeSystem.luau defaults an unattributed
--- MergePlatform to merging tier-1 (Tralalero) brainrots. If you ever add a second
--- merge platform for a different tier, set its "MergeBrainrotName" attribute
--- to that tier's name (e.g. "TrippiTroppi").
+-- MergeSystem.luau cascades merges across every tier automatically, so this platform isn't
+-- tied to any one tier -- no attributes needed. It's created grey and MergeSystem colors it
+-- yellow (and shows the "Merge" text) whenever the owning player has 3+ of some tier to merge.
 --
 -- After running it, restart your Play Test / rojo-served session so MergeSystem.luau
 -- (which scans for MergePlatforms once at server start) picks it up and attaches
@@ -52,7 +51,7 @@ for _, plot in ipairs(plotsFolder:GetChildren()) do
 	platform.Size = PLATFORM_SIZE
 	platform.Anchored = true
 	platform.Material = Enum.Material.Neon
-	platform.Color = Color3.fromRGB(0, 200, 255)
+	platform.Color = Color3.fromRGB(120, 120, 120)
 	platform.Position = basePosition
 	platform.Parent = plot
 

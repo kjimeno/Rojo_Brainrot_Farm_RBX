@@ -11,6 +11,9 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
 
+local READY_COLOR = Color3.fromRGB(235, 219, 0)
+local NOT_READY_COLOR = Color3.fromRGB(163, 162, 165)
+
 local function getPlayerPlot(player: Player)
 	local plotsFolder = workspace:FindFirstChild("Plots")
 	if not plotsFolder then return nil end
@@ -72,6 +75,44 @@ local function mergeIds(data, ids: { string }): (boolean, string)
 	return true, newName
 end
 
+-- Finds up to `count` owned brainrot ids matching `brainrotName`, in insertion order.
+local function findMatchingIds(data, brainrotName: string, count: number): { string }
+	local ids = {}
+	for _, entry in ipairs(data.OwnedBrainrots) do
+		if entry.Name == brainrotName then
+			table.insert(ids, entry.Id)
+			if #ids >= count then break end
+		end
+	end
+	return ids
+end
+
+-- True if the player has enough copies of ANY tier to merge right now.
+local function canMergeAnything(data): boolean
+	for _, brainrotName in ipairs(GameConfig.BrainrotOrder) do
+		if #findMatchingIds(data, brainrotName, GameConfig.MergeRequirement) >= GameConfig.MergeRequirement then
+			return true
+		end
+	end
+	return false
+end
+
+-- Colors the MergePlatform yellow + shows its "Merge" text when the plot owner has enough of
+-- some tier to merge, grey + hidden otherwise. Call this any time data.OwnedBrainrots changes
+-- for that plot's owner (buying, merging) so the indicator stays live -- not just on touch.
+local function updateMergePlatformState(plot: Instance, data)
+	local platform = plot:FindFirstChild("MergePlatform")
+	if not platform then return end
+
+	local ready = canMergeAnything(data)
+	platform.Color = ready and READY_COLOR or NOT_READY_COLOR
+
+	local billboard = platform:FindFirstChild("MergeBillboard")
+	if billboard then
+		billboard.Enabled = ready
+	end
+end
+
 local function mergeBrainrots(player: Player, ids: { string })
 	local data = PlayerDataManager.Get(player)
 	if not data then return false, "Data not loaded" end
@@ -86,6 +127,7 @@ local function mergeBrainrots(player: Player, ids: { string })
 	local plot = getPlayerPlot(player)
 	if plot then
 		BrainrotSpawner.RepackPlot(player, plot, data)
+		updateMergePlatformState(plot, data)
 	end
 
 	return true, resultOrError
@@ -99,7 +141,8 @@ end)
 
 -- ===== Auto-merge platform: step on it to merge 3 owned copies of one tier into the next =====
 -- Floating "Merge" text above the platform (the Part itself, built manually in Studio as
--- <plot>/MergePlatform). Created once per platform, safe to re-run on server start.
+-- <plot>/MergePlatform). Created once per platform, safe to re-run on server start. Starts
+-- disabled (invisible) -- updateMergePlatformState above turns it on/off based on readiness.
 local function ensureMergeBillboard(platform: Instance)
 	if platform:FindFirstChild("MergeBillboard") then return end
 
@@ -109,6 +152,7 @@ local function ensureMergeBillboard(platform: Instance)
 	billboard.Size = UDim2.new(0, 200, 0, 50)
 	billboard.StudsOffset = Vector3.new(0, 5, 0)
 	billboard.AlwaysOnTop = true
+	billboard.Enabled = false
 	billboard.Parent = platform
 
 	local mergeLabel = Instance.new("TextLabel")
@@ -120,18 +164,6 @@ local function ensureMergeBillboard(platform: Instance)
 	mergeLabel.TextColor3 = Color3.new(1, 1, 1)
 	mergeLabel.Text = "Merge"
 	mergeLabel.Parent = billboard
-end
-
--- Finds up to `count` owned brainrot ids matching `brainrotName`, in insertion order.
-local function findMatchingIds(data, brainrotName: string, count: number): { string }
-	local ids = {}
-	for _, entry in ipairs(data.OwnedBrainrots) do
-		if entry.Name == brainrotName then
-			table.insert(ids, entry.Id)
-			if #ids >= count then break end
-		end
-	end
-	return ids
 end
 
 -- Merges every complete group of GameConfig.MergeRequirement, at EVERY tier, cascading all
@@ -163,6 +195,7 @@ local function setupMergePlatform(plot: Instance)
 	if not platform then return end
 
 	ensureMergeBillboard(platform)
+	platform.Color = NOT_READY_COLOR
 
 	local onCooldown = {}
 
@@ -185,6 +218,7 @@ local function setupMergePlatform(plot: Instance)
 		local ownerPlot = getPlayerPlot(player)
 		if ownerPlot then
 			BrainrotSpawner.RepackPlot(player, ownerPlot, data)
+			updateMergePlatformState(ownerPlot, data)
 		end
 		Remotes.MergeBrainrots:FireClient(player, true, mergeCount)
 		print(("[Merge] %s merged %d group(s) across all tiers"):format(player.Name, mergeCount))
@@ -208,4 +242,7 @@ end
 
 initAllMergePlatforms()
 
-return { MergeBrainrots = mergeBrainrots }
+return {
+	MergeBrainrots = mergeBrainrots,
+	UpdateMergePlatform = updateMergePlatformState,
+}
