@@ -30,26 +30,26 @@ energyLabel.TextScaled = true
 energyLabel.Text = "Energy: 0"
 energyLabel.Parent = screenGui
 
--- ===== Bottom-left coin counter =====
-local coinsLabel = Instance.new("TextLabel")
-coinsLabel.Name = "CoinsLabel"
-coinsLabel.AnchorPoint = Vector2.new(0, 1)
-coinsLabel.Position = UDim2.new(0, 20, 1, -20)
-coinsLabel.Size = UDim2.new(0, 220, 0, 40)
-coinsLabel.BackgroundTransparency = 0.4
-coinsLabel.BackgroundColor3 = Color3.new(0, 0, 0)
-coinsLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-coinsLabel.Font = Enum.Font.GothamBold
-coinsLabel.TextScaled = true
-coinsLabel.Text = "Coins: 0"
-coinsLabel.Parent = screenGui
+-- ===== Bottom-left cash counter =====
+local cashLabel = Instance.new("TextLabel")
+cashLabel.Name = "CashLabel"
+cashLabel.AnchorPoint = Vector2.new(0, 1)
+cashLabel.Position = UDim2.new(0, 20, 1, -20)
+cashLabel.Size = UDim2.new(0, 220, 0, 40)
+cashLabel.BackgroundTransparency = 0.4
+cashLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+cashLabel.TextColor3 = Color3.fromRGB(60, 200, 100)
+cashLabel.Font = Enum.Font.GothamBold
+cashLabel.TextScaled = true
+cashLabel.Text = "Cash: 0"
+cashLabel.Parent = screenGui
 
 local storedEnergy = 0
-local coins = 0
+local cash = 0
 
 -- ===== Shop platform afford / can't-afford base color =====
 -- The shop platforms are shared by every player, so the server can't set one "correct"
--- color for everyone -- each client colors the platform Part itself against its OWN coin
+-- color for everyone -- each client colors the platform Part itself against its OWN cash
 -- count here. Setting a property from a LocalScript only changes what this client sees, so
 -- this doesn't affect other players' view of the same platform.
 local AFFORD_COLOR = Color3.fromRGB(85, 255, 127)
@@ -59,7 +59,7 @@ local CANT_AFFORD_COLOR = Color3.fromRGB(255, 60, 60)
 local trackedShopPlatforms = {}
 
 local function colorShopPlatform(platform: BasePart, totalPrice: number)
-	platform.Color = (coins >= totalPrice) and AFFORD_COLOR or CANT_AFFORD_COLOR
+	platform.Color = (cash >= totalPrice) and AFFORD_COLOR or CANT_AFFORD_COLOR
 end
 
 local function refreshAllShopPlatforms()
@@ -99,9 +99,9 @@ Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 		energyLabel.Text = ("Energy: %d"):format(storedEnergy)
 	end
 
-	if stats.Coins ~= nil then
-		coins = stats.Coins
-		coinsLabel.Text = ("Coins: %d"):format(coins)
+	if stats.Cash ~= nil then
+		cash = stats.Cash
+		cashLabel.Text = ("Cash: %d"):format(cash)
 		refreshAllShopPlatforms()
 	end
 end)

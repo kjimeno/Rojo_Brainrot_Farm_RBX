@@ -239,8 +239,8 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 	if not data then return false, "Data not loaded" end
 
 	local totalPrice = config.Price * quantity
-	if data.Coins < totalPrice then
-		return false, "Not enough coins"
+	if data.Cash < totalPrice then
+		return false, "Not enough cash"
 	end
 
 	local plot = getPlayerPlot(player)
@@ -257,7 +257,7 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 		return false, "No free slot on plot"
 	end
 
-	data.Coins -= totalPrice
+	data.Cash -= totalPrice
 
 	local template = BrainrotModelsFolder:FindFirstChild(brainrotName)
 	if not template then
@@ -287,7 +287,7 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 		end
 	end
 
-	return true, data.Coins
+	return true, data.Cash
 end
 
 -- Wipes every brainrot model currently on `plot` and rebuilds them from `data.OwnedBrainrots`

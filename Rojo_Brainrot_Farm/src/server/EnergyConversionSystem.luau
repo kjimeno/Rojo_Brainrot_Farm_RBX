@@ -1,7 +1,7 @@
 -- EnergyConversionSystem.luau
 -- Lives at ServerScriptService.Server.EnergyConversionSystem
--- Handles: collecting energy off the conveyor, depositing it, converting it to coins over time,
--- and collecting the converted coins. Also drives the SurfaceGui "board".
+-- Handles: collecting energy off the conveyor, depositing it, converting it to cash over time,
+-- and collecting the converted cash. Also drives the SurfaceGui "board".
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -12,6 +12,7 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 
 local AFFORD_COLOR = Color3.fromRGB(85, 255, 127)
 local CANT_AFFORD_COLOR = Color3.fromRGB(255, 60, 60)
+local CASH_COLOR = Color3.fromRGB(60, 200, 100)
 
 -- ===== 1. Energy collection =====
 -- Handled in BrainrotSpawner.luau via Tween.Completed instead of a Touched listener here —
@@ -55,15 +56,15 @@ local function updateBoard(plot: Instance, data)
 
 	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
 	label.Text = string.format(
-		"Silo: %d\nPending Coins: %d\nRate: %.1f/s",
-		data.SiloEnergy, data.PendingCoins, rate
+		"Silo: %d\nPending Cash: %d\nRate: %.1f/s",
+		data.SiloEnergy, data.PendingCash, rate
 	)
 
 	local vault = plot:FindFirstChild("CoinVault")
-	local coinBillboard = vault and vault:FindFirstChild("CoinVaultBillboard")
-	local amountLabel = coinBillboard and coinBillboard:FindFirstChild("AmountLabel")
+	local cashBillboard = vault and vault:FindFirstChild("CashVaultBillboard")
+	local amountLabel = cashBillboard and cashBillboard:FindFirstChild("AmountLabel")
 	if amountLabel then
-		amountLabel.Text = tostring(data.PendingCoins)
+		amountLabel.Text = tostring(data.PendingCash)
 	end
 
 	local upgradePlatform = plot:FindFirstChild("UpgradePlatform")
@@ -84,19 +85,19 @@ local function updateBoard(plot: Instance, data)
 				rateLabel.Text = ("+%.2f/s"):format(GameConfig.GetNextRateIncrease(data.ConversionLevel))
 			end
 			local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
-			if costLabel then costLabel.Text = ("%d gold"):format(cost) end
-			upgradePlatform.Color = (data.Coins >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
+			if costLabel then costLabel.Text = ("%d cash"):format(cost) end
+			upgradePlatform.Color = (data.Cash >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
 		end
 	end
 end
 
--- Creates the floating "Collect Coins" / amount text above the gold CoinVault platform,
--- if it doesn't already exist (safe to call every server start without duplicating it).
+-- Creates the floating "Collect Cash" / amount text above the CoinVault platform, if it
+-- doesn't already exist (safe to call every server start without duplicating it).
 local function ensureCoinVaultBillboard(vault: Instance)
-	if vault:FindFirstChild("CoinVaultBillboard") then return end
+	if vault:FindFirstChild("CashVaultBillboard") then return end
 
 	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "CoinVaultBillboard"
+	billboard.Name = "CashVaultBillboard"
 	billboard.Adornee = vault
 	billboard.Size = UDim2.new(0, 200, 0, 80)
 	billboard.StudsOffset = Vector3.new(0, 5, 0)
@@ -111,7 +112,7 @@ local function ensureCoinVaultBillboard(vault: Instance)
 	titleLabel.Font = Enum.Font.GothamBold
 	titleLabel.TextScaled = true
 	titleLabel.TextColor3 = Color3.new(1, 1, 1)
-	titleLabel.Text = "Collect Coins"
+	titleLabel.Text = "Collect Cash"
 	titleLabel.Parent = billboard
 
 	local amountLabel = Instance.new("TextLabel")
@@ -159,8 +160,8 @@ local function ensureUpgradeBillboard(platform: Instance)
 	costLabel.BackgroundTransparency = 1
 	costLabel.Font = Enum.Font.GothamBold
 	costLabel.TextScaled = true
-	costLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-	costLabel.Text = ("%d gold"):format(GameConfig.GetUpgradeCost(0))
+	costLabel.TextColor3 = CASH_COLOR
+	costLabel.Text = ("%d cash"):format(GameConfig.GetUpgradeCost(0))
 	costLabel.Parent = billboard
 end
 
@@ -174,11 +175,11 @@ local function tryUpgradeConversion(player: Player): (boolean, number | string)
 	end
 
 	local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
-	if data.Coins < cost then
-		return false, "Not enough coins"
+	if data.Cash < cost then
+		return false, "Not enough cash"
 	end
 
-	data.Coins -= cost
+	data.Cash -= cost
 	data.ConversionLevel += 1
 	return true, data.ConversionLevel
 end
@@ -216,7 +217,7 @@ local function setupDepositArea(plot: Instance)
 	end)
 end
 
--- ===== 3. Converting silo energy -> pending coins over time (1 energy = 1 coin) =====
+-- ===== 3. Converting silo energy -> pending cash over time (1 energy = 1 cash) =====
 local function startConversionLoop()
 	task.spawn(function()
 		while true do
@@ -225,14 +226,14 @@ local function startConversionLoop()
 				local data = PlayerDataManager.Get(player)
 				if data and data.SiloEnergy > 0 then
 					-- GetConversionRate can be fractional (RateGrowth compounds per upgrade), so
-					-- floor to a whole number here -- otherwise SiloEnergy/PendingCoins would pick
-					-- up fractional remainders and the coins to collect would show decimals.
+					-- floor to a whole number here -- otherwise SiloEnergy/PendingCash would pick
+					-- up fractional remainders and the cash to collect would show decimals.
 					local rate = GameConfig.GetConversionRate(data.ConversionLevel)
 					local converted = math.floor(math.min(rate, data.SiloEnergy))
 
 					if converted > 0 then
 						data.SiloEnergy -= converted
-						data.PendingCoins += converted
+						data.PendingCash += converted
 
 						local plot = getPlayerPlot(player)
 						if plot then
@@ -245,7 +246,7 @@ local function startConversionLoop()
 	end)
 end
 
--- ===== 4. Collecting pending coins from the vault =====
+-- ===== 4. Collecting pending cash from the vault =====
 local function setupCoinVault(plot: Instance)
 	local vault = plot:FindFirstChild("CoinVault")
 	if not vault then return end
@@ -260,13 +261,13 @@ local function setupCoinVault(plot: Instance)
 		if not player or onCooldown[player] then return end
 
 		local data = PlayerDataManager.Get(player)
-		if not data or data.PendingCoins <= 0 then return end
+		if not data or data.PendingCash <= 0 then return end
 
 		onCooldown[player] = true
-		data.Coins += data.PendingCoins
-		data.PendingCoins = 0
+		data.Cash += data.PendingCash
+		data.PendingCash = 0
 
-		Remotes.StatsUpdate:FireClient(player, { Coins = data.Coins, PendingCoins = 0 })
+		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash, PendingCash = 0 })
 		updateBoard(plot, data)
 
 		task.delay(1, function()
@@ -307,7 +308,7 @@ local function setupUpgradePlatform(plot: Instance)
 		local success, resultOrError = tryUpgradeConversion(player)
 		if success then
 			local data = PlayerDataManager.Get(player)
-			Remotes.StatsUpdate:FireClient(player, { Coins = data.Coins })
+			Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash })
 			updateBoard(plot, data)
 			print(("[Upgrade] %s bought conversion level %s"):format(player.Name, tostring(resultOrError)))
 		else

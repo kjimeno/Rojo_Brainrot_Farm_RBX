@@ -18,7 +18,7 @@ local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local EnergyConversionSystem = require(script.Parent.EnergyConversionSystem)
 
--- Floating "Buy 5x Tralalero / 25 gold" text above a shop platform (the Part the
+-- Floating "Buy 5x Tralalero / 25 cash" text above a shop platform (the Part the
 -- ProximityPrompt is parented to). Created once per prompt, safe to re-run on server start.
 local function ensureShopBillboard(prompt: ProximityPrompt, brainrotName: string, quantity: number)
 	local platform = prompt.Parent
@@ -54,8 +54,8 @@ local function ensureShopBillboard(prompt: ProximityPrompt, brainrotName: string
 	priceLabel.BackgroundTransparency = 1
 	priceLabel.Font = Enum.Font.GothamBold
 	priceLabel.TextScaled = true
-	priceLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-	priceLabel.Text = ("%d gold"):format(config.Price * quantity)
+	priceLabel.TextColor3 = Color3.fromRGB(60, 200, 100)
+	priceLabel.Text = ("%d cash"):format(config.Price * quantity)
 	priceLabel.Parent = billboard
 end
 
@@ -80,16 +80,16 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 
 	if success then
 		local data = PlayerDataManager.Get(player)
-		Remotes.StatsUpdate:FireClient(player, { Coins = data.Coins })
+		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash })
 
-		-- Spending coins here can change whether the player can afford their next
+		-- Spending cash here can change whether the player can afford their next
 		-- conversion upgrade, so refresh that sign's afford/can't-afford color too.
 		local plot = EnergyConversionSystem.GetPlayerPlot(player)
 		if plot then
 			EnergyConversionSystem.UpdateBoard(plot, data)
 		end
 
-		print(("[Shop] %s bought %dx %s. Coins left: %d"):format(player.Name, quantity, brainrotName, data.Coins))
+		print(("[Shop] %s bought %dx %s. Cash left: %d"):format(player.Name, quantity, brainrotName, data.Cash))
 	else
 		print(("[Shop] %s failed to buy %dx %s: %s"):format(player.Name, quantity, brainrotName, tostring(resultOrError)))
 		-- Once you build real UI, fire a dedicated remote here to show an error toast/sound.
