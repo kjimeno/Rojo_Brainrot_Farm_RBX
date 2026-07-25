@@ -19,9 +19,14 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 --   ServerStorage/EnergyModels/Tier<N> (OPTIONAL -- one Part per tier, e.g. "Tier1".."Tier15",
 --     for a visually distinct energy drop per brainrot tier. See studio-tools/BuildTieredEnergyParts.luau.
 --     Must be a Part, not a Model -- energy pickups use .CFrame/.Touched directly, same as EnergyPart.)
+--   ServerStorage/StandPlatform (OPTIONAL -- a placeholder Part OR Model that spawns underneath
+--     any brainrot in layer 2+ so it isn't floating mid-air. Falls back to a plain grey
+--     generated block if you haven't built one yet -- swap it out any time for your own
+--     platform, single Part or multi-part Model, either works.)
 local BrainrotModelsFolder = ServerStorage:WaitForChild("BrainrotModels")
 local EnergyPartTemplate = ServerStorage:WaitForChild("EnergyPart")
 local EnergyModelsFolder = ServerStorage:FindFirstChild("EnergyModels")
+local StandPlatformTemplate = ServerStorage:FindFirstChild("StandPlatform")
 
 local function getEnergyTemplate(tier: number): Instance
 	if EnergyModelsFolder then
@@ -115,6 +120,60 @@ end
 
 local function slotCFrame(slot: Instance, layer: number): CFrame
 	return slot.CFrame + Vector3.new(0, layer * GameConfig.StackLayerHeight, 0)
+end
+
+-- Fallback size/color for the generated placeholder stand platform, only used when
+-- ServerStorage/StandPlatform doesn't exist yet.
+local STAND_PLATFORM_THICKNESS = 1
+local STAND_PLATFORM_COLOR = Color3.fromRGB(120, 120, 120)
+
+-- Spawns a placeholder platform under a brainrot sitting at `layer` >= 1 (2nd row and up), so
+-- it isn't floating mid-air -- parented as a CHILD of the brainrot model itself, so it gets
+-- destroyed automatically whenever that model does (repack/merge), no separate cleanup needed.
+-- Does nothing for layer 0, since those already sit directly on the physical BrainrotSlots part.
+-- ServerStorage/StandPlatform can be either a single Part or a multi-part Model -- height and
+-- positioning are handled generically for both via GetExtentsSize()/PivotTo() for Models.
+local function addStandPlatform(model: Model, slot: Instance, layer: number)
+	if layer <= 0 then return end
+
+	local platform: Instance
+	local height: number
+
+	if StandPlatformTemplate then
+		platform = StandPlatformTemplate:Clone()
+		if platform:IsA("Model") then
+			height = platform:GetExtentsSize().Y
+			for _, part in ipairs(platform:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.Anchored = true
+				end
+			end
+		else
+			local part = platform :: BasePart
+			height = part.Size.Y
+			part.Anchored = true
+		end
+	else
+		local part = Instance.new("Part")
+		part.Size = Vector3.new(slot.Size.X, STAND_PLATFORM_THICKNESS, slot.Size.Z)
+		part.Material = Enum.Material.Plastic
+		part.Color = STAND_PLATFORM_COLOR
+		part.Anchored = true
+		platform = part
+		height = STAND_PLATFORM_THICKNESS
+	end
+
+	platform.Name = "StandPlatform"
+
+	-- Sits right under wherever the brainrot's feet are, whatever the platform's own height is.
+	local targetCFrame = slotCFrame(slot, layer) * CFrame.new(0, -height / 2, 0)
+	if platform:IsA("Model") then
+		platform:PivotTo(targetCFrame)
+	else
+		(platform :: BasePart).CFrame = targetCFrame
+	end
+
+	platform.Parent = model
 end
 
 -- Tints every part of a (placeholder) brainrot model by its tier so identical placeholder
@@ -280,6 +339,7 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 					model:SetPrimaryPartCFrame(slotCFrame(slot, layer :: number))
 				end
 				model.Parent = slot
+				addStandPlatform(model, slot, layer :: number)
 				addNameplate(model, brainrotName)
 
 				startEnergyLoop(player, model, brainrotName, plot)
@@ -340,6 +400,7 @@ local function repackPlot(player: Player, plot: Instance, data)
 				model:SetPrimaryPartCFrame(slotCFrame(slot, layer))
 			end
 			model.Parent = slot
+			addStandPlatform(model, slot, layer)
 			addNameplate(model, entry.Name)
 
 			startEnergyLoop(player, model, entry.Name, plot)
