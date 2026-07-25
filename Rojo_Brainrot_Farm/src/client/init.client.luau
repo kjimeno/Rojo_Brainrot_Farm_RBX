@@ -72,8 +72,9 @@ local function formatNumber(amount: number): string
 end
 
 -- `icon` is the ImageLabel itself (e.g. Main.HUD.Left.Icon); `statKey` is the field name to
--- watch for in Remotes.StatsUpdate payloads (e.g. "Cash", "StoredEnergy").
-local function createAnimatedStatDisplay(icon: Instance, statKey: string)
+-- watch for in Remotes.StatsUpdate payloads (e.g. "Cash", "StoredEnergy"); `showBadgeOnDecrease`
+-- controls whether decreases get the floating badge callout too (Cash: yes, Energy: no).
+local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBadgeOnDecrease: boolean)
 	local TransactionRoot = icon.main.Transactions
 
 	local AddTemplate = TransactionRoot.Add
@@ -169,7 +170,11 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string)
 		local diff = newValue - prevValue
 		if diff == 0 then return end
 
-		task.spawn(showTransactionBadge, diff)
+		-- The number itself always tweens smoothly either direction; the floating badge
+		-- callout only shows for gains, unless showBadgeOnDecrease says decreases get one too.
+		if diff > 0 or showBadgeOnDecrease then
+			task.spawn(showTransactionBadge, diff)
+		end
 		tweenValue(prevValue, newValue, 0.5)
 
 		prevValue = newValue
@@ -177,8 +182,8 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string)
 end
 
 local Main = PlayerGui:WaitForChild("Main")
-createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash")
-createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy")
+createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true)
+createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy", false)
 
 Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 	if stats.Cash ~= nil then
