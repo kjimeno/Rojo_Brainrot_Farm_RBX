@@ -61,10 +61,6 @@ local function getPlayerPlot(player: Player)
 	return nil
 end
 
--- Studs between each stacked "row" once every physical BrainrotSlots part already has one
--- brainrot on it -- tweak to taste once you see it against your actual slot/model sizes.
-local STACK_LAYER_HEIGHT = 4
-
 -- Where each energy drop spawns relative to the brainrot that produced it: this many studs
 -- out in front of it (along whichever way its model is actually facing) and this many studs
 -- up. Tweak these two to taste once you see it against your model sizes.
@@ -118,7 +114,7 @@ local function getNextSlot(plot: Instance): (Instance?, number?)
 end
 
 local function slotCFrame(slot: Instance, layer: number): CFrame
-	return slot.CFrame + Vector3.new(0, layer * STACK_LAYER_HEIGHT, 0)
+	return slot.CFrame + Vector3.new(0, layer * GameConfig.StackLayerHeight, 0)
 end
 
 -- Tints every part of a (placeholder) brainrot model by its tier so identical placeholder

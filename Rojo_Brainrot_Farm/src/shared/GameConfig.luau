@@ -172,6 +172,13 @@ end
 -- this to come out as exactly 9x4 each plot needs exactly 9 BrainrotSlots parts built in
 -- Studio (see studio-tools/BuildBrainrotGrid.luau) -- ceil(36 / 9) = 4 layers.
 GameConfig.MaxBrainrotsPerPlot = 36
+
+-- VERTICAL spacing: studs between each stacked row once every physical BrainrotSlots part
+-- already has one brainrot on it. This is the vertical counterpart to DEFAULT_SPACING in
+-- studio-tools/BuildBrainrotGrid.luau (horizontal, between columns) -- separate knobs for
+-- separate axes, and both separate from that script's per-gap CUSTOM_GAPS overrides.
+GameConfig.StackLayerHeight = 4
+
 GameConfig.ConveyorTravelTime = 4
 
 return GameConfig
