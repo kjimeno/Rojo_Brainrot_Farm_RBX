@@ -167,11 +167,11 @@ function GameConfig.GetConversionRate(level: number): number
 end
 
 -- ============ PLOT / CONVEYOR ============
--- 12 columns x 3 rows. BrainrotSpawner derives the grid shape from however many physical
+-- 10 columns x 5 rows. BrainrotSpawner derives the grid shape from however many physical
 -- BrainrotSlots parts a plot actually has (that's the column count) and this total, so for
--- this to come out as exactly 12x3 each plot needs exactly 12 BrainrotSlots parts built in
--- Studio (see studio-tools/BuildBrainrotGrid.luau) -- ceil(36 / 12) = 3 layers.
-GameConfig.MaxBrainrotsPerPlot = 36
+-- this to come out as exactly 10x5 each plot needs exactly 10 BrainrotSlots parts built in
+-- Studio (see studio-tools/BuildBrainrotGrid.luau) -- ceil(50 / 10) = 5 layers.
+GameConfig.MaxBrainrotsPerPlot = 50
 
 -- VERTICAL spacing: studs between each stacked row once every physical BrainrotSlots part
 -- already has one brainrot on it. This is the vertical counterpart to DEFAULT_SPACING in

@@ -6,8 +6,8 @@
 --
 -- BrainrotSpawner derives the grid's column count from however many physical BrainrotSlots
 -- parts a plot has, and the row count from GameConfig.MaxBrainrotsPerPlot / columns (rounded
--- up). GameConfig.MaxBrainrotsPerPlot is now 36, so for the grid to come out as exactly
--- 12 columns x 3 rows, each plot needs EXACTLY 12 BrainrotSlots parts. This script rebuilds
+-- up). GameConfig.MaxBrainrotsPerPlot is now 50, so for the grid to come out as exactly
+-- 10 columns x 5 rows, each plot needs EXACTLY 10 BrainrotSlots parts. This script rebuilds
 -- each plot's BrainrotSlots folder to have exactly that many, using your first existing slot
 -- as the template (size/material/etc.) -- or DEFAULT_TEMPLATE_SIZE/COLOR below if that
 -- BrainrotSlots folder is currently empty.
@@ -15,19 +15,19 @@
 -- Spacing between columns is NOT required to be uniform -- BrainrotSpawner just sorts
 -- whatever slots exist by their live world X position, it doesn't assume any particular gap.
 -- CUSTOM_GAPS below lets you widen (or narrow) specific gaps; every other gap uses
--- DEFAULT_SPACING. Gap N is the space between column N and column N+1 -- e.g. CUSTOM_GAPS[4]
--- is the gap between column 4 and column 5.
+-- DEFAULT_SPACING. Gap N is the space between column N and column N+1 -- e.g. CUSTOM_GAPS[3]
+-- is the gap between column 3 and column 4.
 --
 -- WARNING: this destroys your plots' existing BrainrotSlots parts (and any brainrot models
--- currently sitting on them) and replaces them with 12 fresh ones. Player data isn't touched --
+-- currently sitting on them) and replaces them with 10 fresh ones. Player data isn't touched --
 -- only the visuals -- so the next merge or purchase will redraw everything correctly at the
 -- new layout. If you have brainrots you want to see again without buying/merging, trigger a
 -- purchase or merge once after running this to force a repack.
 
 local Workspace = game:GetService("Workspace")
 
-local NUM_COLUMNS = 12
-local DEFAULT_SPACING = 8 -- studs between columns, for any gap not listed in CUSTOM_GAPS
+local NUM_COLUMNS = 10
+local DEFAULT_SPACING = 10 -- studs between columns, for any gap not listed in CUSTOM_GAPS
 
 -- Used ONLY when a plot's BrainrotSlots folder is completely empty (nothing to clone as a
 -- template from). Edit to taste, or just build one Part by hand in BrainrotSlots before
@@ -37,20 +37,20 @@ local DEFAULT_TEMPLATE_COLOR = Color3.fromRGB(163, 162, 165)
 
 -- Edit these to change specific gaps. Gap N = space between column N and column N+1.
 local CUSTOM_GAPS = {
-	[4] = 15, -- between column 4 and column 5
-	[8] = 15, -- between column 8 and column 9
+	[3] = 12, -- between column 3 and column 4
+	[7] = 12, -- between column 7 and column 8
 }
 
--- Columns 5-8 stay on the straight reference line; columns 1-4 and 9-12 each bend away from it
+-- Columns 4-7 stay on the straight reference line; columns 1-3 and 8-10 each bend away from it
 -- by WING_ANGLE_DEGREES, mirrored so both sides are symmetric (a "V"/fan shape). 0 = perfectly
 -- straight, same as before this feature existed. Flip the sign if it bends the wrong way once
--- you see it in Studio. This 4/4/4 split lines up with the CUSTOM_GAPS boundaries above (4-5
--- and 8-9) -- if you change those gap positions, update these three lists to match; they must
+-- you see it in Studio. This 3/4/3 split lines up with the CUSTOM_GAPS boundaries above (3-4
+-- and 7-8) -- if you change those gap positions, update these three lists to match; they must
 -- partition 1..NUM_COLUMNS between them.
-local WING_ANGLE_DEGREES = 30
-local LEFT_WING_COLUMNS = { 1, 2, 3, 4 }
-local MIDDLE_COLUMNS = { 5, 6, 7, 8 }
-local RIGHT_WING_COLUMNS = { 9, 10, 11, 12 }
+local WING_ANGLE_DEGREES = 45
+local LEFT_WING_COLUMNS = { 1, 2, 3 }
+local MIDDLE_COLUMNS = { 4, 5, 6, 7 }
+local RIGHT_WING_COLUMNS = { 8, 9, 10 }
 
 -- Per-column XZ-plane offset from the first column (Y always 0), and how many degrees that
 -- column's own facing should rotate (0 for the straight middle, +-WING_ANGLE_DEGREES for the
