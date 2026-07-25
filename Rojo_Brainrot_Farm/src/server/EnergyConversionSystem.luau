@@ -10,8 +10,8 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 
-local AFFORD_COLOR = Color3.fromRGB(85, 255, 127)
-local CANT_AFFORD_COLOR = Color3.fromRGB(255, 60, 60)
+local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
+local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
 local CASH_COLOR = Color3.fromRGB(60, 200, 100)
 
 -- ===== 1. Energy collection =====
@@ -82,10 +82,10 @@ local function updateBoard(plot: Instance, data)
 			-- respectively), so both lines have to be recomputed from the player's current level
 			-- every time, not baked in once when the billboard was first created.
 			if rateLabel then
-				rateLabel.Text = ("+%.2f/s"):format(GameConfig.GetNextRateIncrease(data.ConversionLevel))
+				rateLabel.Text = ("+%.2f per second"):format(GameConfig.GetNextRateIncrease(data.ConversionLevel))
 			end
 			local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
-			if costLabel then costLabel.Text = ("%d cash"):format(cost) end
+			if costLabel then costLabel.Text = ("$%d"):format(cost) end
 			upgradePlatform.Color = (data.Cash >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
 		end
 	end
@@ -150,7 +150,7 @@ local function ensureUpgradeBillboard(platform: Instance)
 	rateLabel.Font = Enum.Font.GothamBold
 	rateLabel.TextScaled = true
 	rateLabel.TextColor3 = Color3.new(1, 1, 1)
-	rateLabel.Text = ("+%.2f/s"):format(GameConfig.ConversionUpgrade.RatePerLevel)
+	rateLabel.Text = ("+%.2f per second"):format(GameConfig.ConversionUpgrade.RatePerLevel)
 	rateLabel.Parent = billboard
 
 	local costLabel = Instance.new("TextLabel")
@@ -161,7 +161,7 @@ local function ensureUpgradeBillboard(platform: Instance)
 	costLabel.Font = Enum.Font.GothamBold
 	costLabel.TextScaled = true
 	costLabel.TextColor3 = CASH_COLOR
-	costLabel.Text = ("%d cash"):format(GameConfig.GetUpgradeCost(0))
+	costLabel.Text = ("$%d"):format(GameConfig.GetUpgradeCost(0))
 	costLabel.Parent = billboard
 end
 
