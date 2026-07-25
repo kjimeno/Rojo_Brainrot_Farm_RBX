@@ -13,28 +13,6 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 
--- ===== Bottom-of-screen energy counter =====
--- StatsUpdate only ever sends the fields that changed, so we keep a running
--- total locally and just overwrite whichever keys show up in each event.
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EnergyHud"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = PlayerGui
-
-local energyLabel = Instance.new("TextLabel")
-energyLabel.Name = "EnergyLabel"
-energyLabel.AnchorPoint = Vector2.new(0.5, 1)
-energyLabel.Position = UDim2.new(0.5, 0, 1, -20)
-energyLabel.Size = UDim2.new(0, 300, 0, 40)
-energyLabel.BackgroundTransparency = 0.4
-energyLabel.BackgroundColor3 = Color3.new(0, 0, 0)
-energyLabel.TextColor3 = Color3.new(1, 1, 1)
-energyLabel.Font = Enum.Font.GothamBold
-energyLabel.TextScaled = true
-energyLabel.Text = "Energy: 0"
-energyLabel.Parent = screenGui
-
-local storedEnergy = 0
 local cash = 0
 
 -- ===== Shop platform afford / can't-afford base color =====
@@ -80,11 +58,12 @@ for _, descendant in ipairs(workspace:GetDescendants()) do
 end
 workspace.DescendantAdded:Connect(trackShopPlatform)
 
--- ===== Cash display (from the purchased UI kit's "Icon" HUD element) =====
--- Lives at PlayerGui.Main.HUD.Left.Icon. Reacts to our own Remotes.StatsUpdate instead of the
--- kit's original Player.leaderstats.Cash.Changed, since this game doesn't use leaderstats for
--- cash. Everything else (the tween, tick sound, floating +/- transaction badge) is unchanged
--- from the kit.
+-- ===== Animated stat displays (from the purchased UI kit's "Icon" HUD element) =====
+-- Same reusable structure for both Cash (Main.HUD.Left.Icon) and Energy
+-- (Main.HUD.Up.Icon): an ImageLabel with "main"/"shadow" TextLabels and a "Transactions"
+-- frame holding "Add"/"Subtract" badge templates. Reacts to our own Remotes.StatsUpdate
+-- instead of the kit's original Player.leaderstats.*.Changed, since this game doesn't use
+-- leaderstats. The tween/tick sound/floating +/- badge animation is unchanged from the kit.
 local function formatNumber(amount: number): string
 	local isNegative = amount < 0
 	local digits = tostring(math.floor(math.abs(amount)))
@@ -92,10 +71,10 @@ local function formatNumber(amount: number): string
 	return (isNegative and "-" or "") .. reversed:reverse()
 end
 
-local function initCashDisplay()
-	local Main = PlayerGui:WaitForChild("Main")
-	local CashLabel = Main.HUD.Left.Icon
-	local TransactionRoot = CashLabel.main.Transactions
+-- `icon` is the ImageLabel itself (e.g. Main.HUD.Left.Icon); `statKey` is the field name to
+-- watch for in Remotes.StatsUpdate payloads (e.g. "Cash", "StoredEnergy").
+local function createAnimatedStatDisplay(icon: Instance, statKey: string)
+	local TransactionRoot = icon.main.Transactions
 
 	local AddTemplate = TransactionRoot.Add
 	local SubTemplate = TransactionRoot.Subtract
@@ -111,13 +90,13 @@ local function initCashDisplay()
 	tickSound.Volume = 1
 	tickSound.Parent = SoundService
 
-	local function setCashLabel(amount: number)
+	local function setLabel(amount: number)
 		local formatted = formatNumber(amount)
-		CashLabel.main.Text = formatted
-		CashLabel.shadow.Text = formatted
+		icon.main.Text = formatted
+		icon.shadow.Text = formatted
 	end
 
-	local function tweenCashValue(from: number, to: number, duration: number)
+	local function tweenValue(from: number, to: number, duration: number)
 		if activeRender then
 			activeRender:Disconnect()
 			activeRender = nil
@@ -128,7 +107,7 @@ local function initCashDisplay()
 
 		activeRender = RunService.RenderStepped:Connect(function()
 			local alpha = math.clamp((tick() - startTime) / duration, 0, 1)
-			setCashLabel(math.floor(from + (to - from) * alpha))
+			setLabel(math.floor(from + (to - from) * alpha))
 
 			if to > from and tick() - lastTick >= 0.05 then
 				lastTick = tick()
@@ -136,7 +115,7 @@ local function initCashDisplay()
 			end
 
 			if alpha >= 1 then
-				setCashLabel(to)
+				setLabel(to)
 				activeRender:Disconnect()
 				activeRender = nil
 			end
@@ -175,15 +154,15 @@ local function initCashDisplay()
 	end
 
 	Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
-		if stats.Cash == nil then return end
-		local newValue = stats.Cash
+		local newValue = stats[statKey]
+		if newValue == nil then return end
 
 		if not hasInitialized then
 			-- The first value we ever see is the loaded starting balance, not a real gain --
 			-- snap to it silently, no count-up animation, no transaction badge.
 			hasInitialized = true
 			prevValue = newValue
-			setCashLabel(newValue)
+			setLabel(newValue)
 			return
 		end
 
@@ -191,20 +170,17 @@ local function initCashDisplay()
 		if diff == 0 then return end
 
 		task.spawn(showTransactionBadge, diff)
-		tweenCashValue(prevValue, newValue, 0.5)
+		tweenValue(prevValue, newValue, 0.5)
 
 		prevValue = newValue
 	end)
 end
 
-initCashDisplay()
+local Main = PlayerGui:WaitForChild("Main")
+createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash")
+createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy")
 
 Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
-	if stats.StoredEnergy ~= nil then
-		storedEnergy = stats.StoredEnergy
-		energyLabel.Text = ("Energy: %d"):format(storedEnergy)
-	end
-
 	if stats.Cash ~= nil then
 		cash = stats.Cash
 		refreshAllShopPlatforms()
@@ -212,8 +188,8 @@ Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 end)
 
 -- Ask the server for our actual loaded stats now that we're listening for the reply above --
--- without this, everything just sits at these scripts' own built-in defaults (Energy: 0,
--- Cash: 0, etc.) until some other action (buying, depositing, ...) happens to push an update.
+-- without this, everything just sits at these scripts' own built-in defaults (0, "$0", etc.)
+-- until some other action (buying, depositing, ...) happens to push an update.
 Remotes.RequestStats:FireServer()
 
 -- Example client-side call (wire this to a real button later):
