@@ -247,6 +247,9 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			-- Forced every spawn regardless of how the template itself was authored in Studio.
 			energyPart.Anchored = false
 			energyPart.CanCollide = true
+			if energyPart:IsA("Part") then
+				energyPart.Shape = Enum.PartType.Block
+			end
 			-- Local -Z is "forward" in Roblox's CFrame convention, so this multiplication spawns
 			-- it ENERGY_DROP_DISTANCE studs out in front of the brainrot (rotated correctly with
 			-- however the model is actually facing) and ENERGY_DROP_HEIGHT studs up.
