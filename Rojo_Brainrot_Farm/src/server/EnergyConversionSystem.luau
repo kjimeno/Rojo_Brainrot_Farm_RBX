@@ -231,18 +231,33 @@ local function setupDepositArea(plot: Instance)
 end
 
 -- ===== 3. Converting silo energy -> pending cash over time (1 energy = 1 cash) =====
+-- Ticks much faster than once per second so the "$X to collect" sign climbs in small,
+-- frequent steps instead of one visible jump per second -- feels closer to real-time.
+-- GetConversionRate can be fractional (RateGrowth compounds per upgrade), and now each tick
+-- only covers a fraction of a second's worth of the rate too, so a per-player leftover
+-- accumulator carries fractional progress between ticks -- PendingCash/SiloEnergy still only
+-- ever change by whole numbers, the fractional part never leaks into what's displayed.
+local CONVERSION_TICK_INTERVAL = 0.1
+local conversionRemainders = {} -- [player] = leftover fractional energy not yet converted
+
+Players.PlayerRemoving:Connect(function(player)
+	conversionRemainders[player] = nil
+end)
+
 local function startConversionLoop()
 	task.spawn(function()
 		while true do
-			task.wait(1)
+			task.wait(CONVERSION_TICK_INTERVAL)
 			for _, player in ipairs(Players:GetPlayers()) do
 				local data = PlayerDataManager.Get(player)
 				if data and data.SiloEnergy > 0 then
-					-- GetConversionRate can be fractional (RateGrowth compounds per upgrade), so
-					-- floor to a whole number here -- otherwise SiloEnergy/PendingCash would pick
-					-- up fractional remainders and the cash to collect would show decimals.
 					local rate = GameConfig.GetConversionRate(data.ConversionLevel)
-					local converted = math.floor(math.min(rate, data.SiloEnergy))
+					local remainder = (conversionRemainders[player] or 0) + (rate * CONVERSION_TICK_INTERVAL)
+
+					-- Capped at SiloEnergy too, in case the silo runs dry mid-tick -- any
+					-- unused fractional credit just stays banked for the next deposit.
+					local converted = math.min(math.floor(remainder), data.SiloEnergy)
+					conversionRemainders[player] = remainder - converted
 
 					if converted > 0 then
 						data.SiloEnergy -= converted
