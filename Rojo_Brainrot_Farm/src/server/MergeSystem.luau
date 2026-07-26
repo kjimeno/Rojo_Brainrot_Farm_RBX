@@ -3,6 +3,7 @@
 -- Handles merging GameConfig.MergeRequirement copies of the same-tier brainrot into the next tier.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
@@ -13,6 +14,54 @@ local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
 
 local READY_COLOR = Color3.fromRGB(235, 219, 0)
 local NOT_READY_COLOR = Color3.fromRGB(163, 162, 165)
+
+-- Optional: ServerStorage/"Particle effects"/HitEffect (from the purchased UI/VFX kit) -- a
+-- one-shot particle burst rig, kept as a template in ServerStorage (server-only, never
+-- replicates, never visible until cloned) same as BrainrotModels/EnergyPart/StandPlatform.
+-- If it's not there, merges just skip the effect silently.
+local HIT_EFFECT_BURST_COUNT = 1
+local particleEffectsFolder = ServerStorage:FindFirstChild("Particle effects")
+local hitEffectTemplate = particleEffectsFolder and particleEffectsFolder:FindFirstChild("HitEffect")
+
+-- Creates ONE permanent copy of HitEffect at `platform`, safe to call every server start
+-- without duplicating it. Cloning it once here (rather than per-merge) means it's already
+-- replicated to every client long before anyone ever merges -- calling :Emit() on a
+-- brand-new same-frame Clone() can visibly lag or get dropped while the client is still
+-- catching up on the new instance existing at all, so this avoids that delay entirely.
+local function ensureHitEffect(platform: Instance)
+	if not hitEffectTemplate then return end
+	if platform:FindFirstChild("HitEffect") then return end
+
+	local effect = hitEffectTemplate:Clone()
+	effect.CFrame = platform.CFrame
+
+	-- This now sits permanently in the workspace (not tucked away in ServerStorage), so make
+	-- sure it's not left continuously emitting -- :Emit() below still bursts fine regardless
+	-- of Enabled, this just stops it from idly looping forever at the platform.
+	for _, descendant in ipairs(effect:GetDescendants()) do
+		if descendant:IsA("ParticleEmitter") then
+			descendant.Enabled = false
+		end
+	end
+
+	effect.Parent = platform
+end
+
+-- Fires every ParticleEmitter under `platform`'s (already-existing, already-replicated)
+-- HitEffect once -- a "burst" rather than continuous emission.
+local function playMergeEffect(plot: Instance)
+	local platform = plot:FindFirstChild("MergePlatform")
+	if not platform then return end
+
+	local effect = platform:FindFirstChild("HitEffect")
+	if not effect then return end
+
+	for _, descendant in ipairs(effect:GetDescendants()) do
+		if descendant:IsA("ParticleEmitter") then
+			descendant:Emit(HIT_EFFECT_BURST_COUNT)
+		end
+	end
+end
 
 local function getPlayerPlot(player: Player)
 	local plotsFolder = workspace:FindFirstChild("Plots")
@@ -120,12 +169,17 @@ local function mergeBrainrots(player: Player, ids: { string })
 	local success, resultOrError = mergeIds(data, ids)
 	if not success then return false, resultOrError end
 
-	-- Full repack rather than just reusing the one freed slot: merging removes 3 brainrots
-	-- from potentially 3 different spots, so only patching the last one would leave holes
-	-- wherever the other two used to sit. RepackPlot wipes and rebuilds the whole layout from
-	-- data.OwnedBrainrots, highest tier first, with no gaps in the bottom row.
 	local plot = getPlayerPlot(player)
 	if plot then
+		-- Burst fires first so it's instant -- RepackPlot below rebuilds every brainrot model
+		-- on the whole plot (not just the merged ones), which can take a noticeable moment
+		-- with a large inventory, and shouldn't delay the visual feedback.
+		playMergeEffect(plot)
+
+		-- Full repack rather than just reusing the one freed slot: merging removes 3 brainrots
+		-- from potentially 3 different spots, so only patching the last one would leave holes
+		-- wherever the other two used to sit. RepackPlot wipes and rebuilds the whole layout
+		-- from data.OwnedBrainrots, highest tier first, with no gaps in the bottom row.
 		BrainrotSpawner.RepackPlot(player, plot, data)
 		updateMergePlatformState(plot, data)
 	end
@@ -195,6 +249,7 @@ local function setupMergePlatform(plot: Instance)
 	if not platform then return end
 
 	ensureMergeBillboard(platform)
+	ensureHitEffect(platform)
 	platform.Color = NOT_READY_COLOR
 
 	local onCooldown = {}
@@ -217,6 +272,10 @@ local function setupMergePlatform(plot: Instance)
 		-- player's own plot, even if they're standing on someone else's platform.
 		local ownerPlot = getPlayerPlot(player)
 		if ownerPlot then
+			-- Burst fires first so it's instant -- RepackPlot below rebuilds every brainrot
+			-- model on the whole plot, which can take a noticeable moment with a large
+			-- inventory, and shouldn't delay the visual feedback.
+			playMergeEffect(ownerPlot)
 			BrainrotSpawner.RepackPlot(player, ownerPlot, data)
 			updateMergePlatformState(ownerPlot, data)
 		end
