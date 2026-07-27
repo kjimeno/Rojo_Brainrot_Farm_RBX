@@ -351,6 +351,63 @@ local function playCashCollectBurst()
 	end
 end
 
+-- ===== Energy deposit rain: HUD energy icons fall down the screen when you deposit =====
+-- Purely a 2D ScreenGui effect (unlike the 3D cash burst) -- icons spawn just above the top
+-- edge at random horizontal spots and tween straight down past the bottom edge, then destroy.
+local ENERGY_DROP_MIN_COUNT = 10
+local ENERGY_DROP_MAX_COUNT = 14
+local ENERGY_DROP_ICON_SIZE = UDim2.new(0, 120, 0, 120)
+local ENERGY_DROP_FALL_MIN_DURATION = 1.6
+local ENERGY_DROP_FALL_MAX_DURATION = 2.4
+local ENERGY_DROP_STAGGER_MAX = 0.4 -- seconds; random delay before each icon starts falling, so they don't all move in lockstep
+local ENERGY_DROP_DRIFT_MAX = 0.10 -- scale units of sideways drift over the fall -- gives each icon its own diagonal angle instead of falling straight down
+local ENERGY_DROP_ROTATION_MAX = 50 -- degrees; each icon also spins to a random amount as it falls
+
+local energyDropGui = Instance.new("ScreenGui")
+energyDropGui.Name = "EnergyDropEffect"
+energyDropGui.ResetOnSpawn = false
+energyDropGui.IgnoreGuiInset = true
+energyDropGui.Parent = PlayerGui
+
+local function playEnergyDropIcon(iconImage: string)
+	local icon = Instance.new("ImageLabel")
+	icon.BackgroundTransparency = 1
+	icon.Size = ENERGY_DROP_ICON_SIZE
+	icon.Image = iconImage
+	icon.ScaleType = Enum.ScaleType.Fit -- preserves the image's real aspect ratio instead of stretching it to fill a square label
+	icon.AnchorPoint = Vector2.new(0.5, 0)
+
+	local startX = math.random()
+	icon.Position = UDim2.new(startX, 0, -0.05, 0)
+	icon.Parent = energyDropGui
+
+	task.wait(math.random() * ENERGY_DROP_STAGGER_MAX)
+
+	-- Each icon drifts sideways by its own random amount and spins by its own random amount,
+	-- so the whole group falls at a mix of angles instead of a uniform straight drop.
+	local endX = math.clamp(startX + (math.random() * 2 - 1) * ENERGY_DROP_DRIFT_MAX, -0.1, 1.1)
+	local endRotation = (math.random() * 2 - 1) * ENERGY_DROP_ROTATION_MAX
+	local duration = ENERGY_DROP_FALL_MIN_DURATION + math.random() * (ENERGY_DROP_FALL_MAX_DURATION - ENERGY_DROP_FALL_MIN_DURATION)
+	local fallTween = TweenService:Create(
+		icon,
+		TweenInfo.new(duration, Enum.EasingStyle.Linear),
+		{ Position = UDim2.new(endX, 0, 1.1, 0), Rotation = endRotation }
+	)
+	fallTween:Play()
+	fallTween.Completed:Wait()
+
+	icon:Destroy()
+end
+
+local function playEnergyDepositRain()
+	local iconImage = Main.HUD.Up.Icon.Image
+	local count = math.random(ENERGY_DROP_MIN_COUNT, ENERGY_DROP_MAX_COUNT)
+
+	for _ = 1, count do
+		task.spawn(playEnergyDropIcon, iconImage)
+	end
+end
+
 Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 	if stats.Cash ~= nil then
 		cash = stats.Cash
@@ -359,6 +416,10 @@ Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 
 	if stats.VaultCollectedAmount ~= nil and stats.VaultCollectedAmount > 0 then
 		playCashCollectBurst()
+	end
+
+	if stats.DepositedAmount ~= nil and stats.DepositedAmount > 0 then
+		playEnergyDepositRain()
 	end
 end)
 
