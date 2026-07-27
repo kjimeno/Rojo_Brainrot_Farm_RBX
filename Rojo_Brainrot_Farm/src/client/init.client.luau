@@ -194,10 +194,11 @@ local CASH_BURST_MAX_DISTANCE = 20
 local CASH_BURST_POP_DURATION = 0.7
 local CASH_BURST_MIN_ELEVATION_DEGREES = 15 -- burst direction is never shallower than this above the horizon
 local CASH_BURST_GRAVITY = 25 -- studs/sec^2; slight, not full engine gravity -- just enough to arc the pop
-local CASH_BURST_RETURN_BASE_RATE = 3 -- starting catch-up rate right when the return begins -- slow
-local CASH_BURST_RETURN_ACCEL = 10 -- how fast that catch-up rate itself grows per second (exponential) -- ramps up hard
-local CASH_BURST_RETURN_ARRIVE_DISTANCE = 0.7 -- studs; disappears once actually this close to the player
-local CASH_BURST_RETURN_TIMEOUT = 2 -- safety cutoff in seconds so an edge case (e.g. character gone) can't loop forever
+local CASH_BURST_RETURN_MIN_SPEED = 6 -- studs/sec at the very start of the return -- slow drift
+local CASH_BURST_RETURN_MAX_SPEED = 60 -- studs/sec HARD CAP it ramps up toward -- comfortably faster than the player can run, but bounded
+local CASH_BURST_RETURN_ACCEL_PER_SEC = 90 -- studs/sec^2; how hard it accelerates from MIN toward the MAX cap
+local CASH_BURST_RETURN_ARRIVE_DISTANCE = 1.5 -- studs; disappears once actually this close to the player
+local CASH_BURST_RETURN_TIMEOUT = 4 -- safety cutoff in seconds so an edge case (e.g. character gone) can't loop forever
 local CASH_TRAIL_WIDTH_STUDS = 0.9 -- total ribbon width at its widest, right at the icon
 local CASH_TRAIL_TRANSPARENCY = 0.5 -- 0 = fully solid, 1 = fully invisible, for most of the ribbon's length
 
@@ -219,14 +220,23 @@ end
 -- One flying icon: bursts from `originCFrame` outward into the air, then immediately flies
 -- straight to wherever the character currently is -- no stopping in between. Fine for it to
 -- pass in front of the character since AlwaysOnTop is on.
+--
+-- IMPORTANT: this part is UNANCHORED and moved by setting real AssemblyLinearVelocity every
+-- physics step, NOT by us overwriting .CFrame every frame. Trail is built to track physically
+-- simulated parts; a script that repeatedly teleports an Anchored part's CFrame updates on a
+-- different internal timing than Trail samples on, which is what was causing the trail to
+-- visibly lead ahead of the icon (worse at high speed, since a fixed one-step timing gap turns
+-- into a bigger visual gap the faster the icon moves). Letting the physics engine actually move
+-- the part keeps the Trail's history in sync with the icon by construction.
 local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
 	local anchor = Instance.new("Part")
 	anchor.Name = "CashBurstIcon"
 	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
 	anchor.Transparency = 1
 	anchor.CanCollide = false
-	anchor.Anchored = true
-	anchor.CFrame = originCFrame
+	anchor.Anchored = false
+	anchor.Massless = true
+	anchor.CFrame = CFrame.new(originCFrame.Position)
 	anchor.Parent = cashBurstIconsFolder
 
 	local billboard = Instance.new("BillboardGui")
@@ -287,21 +297,22 @@ local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
 
 	local burstDistance = CASH_BURST_MIN_DISTANCE + math.random() * (CASH_BURST_MAX_DISTANCE - CASH_BURST_MIN_DISTANCE)
 
-	-- Simulates the pop with slight gravity (an actual velocity + downward acceleration each
-	-- frame) instead of a straight-line tween, so it arcs like a real toss instead of flying
-	-- dead straight to its target point.
+	-- Slight gravity: we recompute the desired velocity every physics step and hand it straight
+	-- to AssemblyLinearVelocity, so the part's own real gravity never gets a chance to
+	-- accumulate on top of this -- our number is the only thing driving it.
 	local velocity = randomDir * (burstDistance / CASH_BURST_POP_DURATION)
+	anchor.AssemblyLinearVelocity = velocity
 	local popStart = os.clock()
 	while os.clock() - popStart < CASH_BURST_POP_DURATION do
-		local dt = RunService.RenderStepped:Wait()
+		local dt = RunService.Heartbeat:Wait()
 		velocity = velocity - Vector3.new(0, CASH_BURST_GRAVITY * dt, 0)
-		anchor.CFrame = CFrame.new(anchor.Position + velocity * dt)
+		anchor.AssemblyLinearVelocity = velocity
 	end
 
-	-- Chases the character's ACTUAL live position every frame, but the catch-up rate itself
-	-- isn't fixed -- it starts at CASH_BURST_RETURN_BASE_RATE (slow) and grows exponentially
-	-- over elapsed return time at CASH_BURST_RETURN_ACCEL, so the icon drifts lazily at first
-	-- and then rockets in to meet you. Never disappears until it's actually reached you.
+	-- Chases the character's ACTUAL live position every physics step. Speed ramps linearly from
+	-- CASH_BURST_RETURN_MIN_SPEED at CASH_BURST_RETURN_ACCEL_PER_SEC studs/sec^2, hard-capped at
+	-- CASH_BURST_RETURN_MAX_SPEED -- comfortably faster than the player can ever run, so once
+	-- it's ramped up it's guaranteed to close the gap instead of settling into matching pace.
 	local returnStart = os.clock()
 	while true do
 		local character = player.Character
@@ -310,21 +321,19 @@ local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
 			break
 		end
 
-		local currentPos = anchor.Position
-		local targetPos = root.Position
-		local distance = (targetPos - currentPos).Magnitude
+		local toTarget = root.Position - anchor.Position
+		local distance = toTarget.Magnitude
 		local elapsed = os.clock() - returnStart
 		if distance <= CASH_BURST_RETURN_ARRIVE_DISTANCE or elapsed > CASH_BURST_RETURN_TIMEOUT then
-			anchor.CFrame = CFrame.new(targetPos)
 			break
 		end
 
-		local dt = RunService.RenderStepped:Wait()
-		local effectiveRate = CASH_BURST_RETURN_BASE_RATE * math.exp(CASH_BURST_RETURN_ACCEL * elapsed)
-		local alpha = 1 - math.exp(-effectiveRate * dt)
-		anchor.CFrame = CFrame.new(currentPos:Lerp(targetPos, math.min(alpha, 1)))
+		local currentSpeed = math.min(CASH_BURST_RETURN_MIN_SPEED + CASH_BURST_RETURN_ACCEL_PER_SEC * elapsed, CASH_BURST_RETURN_MAX_SPEED)
+		anchor.AssemblyLinearVelocity = toTarget.Unit * currentSpeed
+		RunService.Heartbeat:Wait()
 	end
 
+	anchor.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 	trail.Enabled = false
 	anchor:Destroy()
 end
