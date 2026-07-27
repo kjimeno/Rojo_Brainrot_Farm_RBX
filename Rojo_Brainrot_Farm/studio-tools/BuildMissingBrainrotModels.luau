@@ -6,7 +6,7 @@
 --
 -- Fills in any ServerStorage/BrainrotModels/<Name> folder that's missing for a name in
 -- GameConfig.Brainrots, by cloning whichever placeholder Model already exists there (e.g.
--- your Tralalero block) and renaming the clone. The tier color/tint is applied automatically
+-- your Noobini Pizzanini block) and renaming the clone. The tier color/tint is applied automatically
 -- at spawn time regardless of the model's own geometry (see BrainrotSpawner.colorModelByTier),
 -- so reusing the same block for every tier is fine visually -- swap in real models later
 -- whenever you want, same folder names.

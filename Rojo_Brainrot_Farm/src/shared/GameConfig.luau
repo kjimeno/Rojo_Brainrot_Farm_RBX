@@ -5,109 +5,108 @@
 local GameConfig = {}
 
 -- ============ BRAINROT TIERS ============
--- Names/prices/drop rates below are placeholders like everything else so far -- swap them
--- for whatever real "brainrot" names/balancing you want later. Price keeps the x5-per-tier
--- pattern you set for tiers 1-5; EnergyPerDrop keeps roughly the same ~2.5x-per-tier curve.
+-- Price keeps the x5-per-tier pattern you set for tiers 1-5; EnergyPerDrop keeps roughly the
+-- same ~2.5x-per-tier curve. Just the names changed here -- values are unchanged per tier.
 GameConfig.Brainrots = {
-	["Tralalero"] = {
+	["Noobini Pizzanini"] = {
 		Tier = 1,
 		Price = 5,
 		EnergyPerDrop = 1,
 		DropInterval = 3,
-		MergeInto = "TrippiTroppi",
+		MergeInto = "Tim Cheese",
 	},
-	["TrippiTroppi"] = {
+	["Tim Cheese"] = {
 		Tier = 2,
 		Price = 25,
 		EnergyPerDrop = 3,
 		DropInterval = 3,
-		MergeInto = "BombardiroCrocodilo",
+		MergeInto = "Trippi Troppi",
 	},
-	["BombardiroCrocodilo"] = {
+	["Trippi Troppi"] = {
 		Tier = 3,
 		Price = 125,
 		EnergyPerDrop = 8,
 		DropInterval = 3,
-		MergeInto = "CappuccinoAssassino",
+		MergeInto = "Trippi Troppi Troppa Trippa",
 	},
-	["CappuccinoAssassino"] = {
+	["Trippi Troppi Troppa Trippa"] = {
 		Tier = 4,
 		Price = 625,
 		EnergyPerDrop = 20,
 		DropInterval = 3,
-		MergeInto = "TungTungSahur",
+		MergeInto = "Cappuccino Assassino",
 	},
-	["TungTungSahur"] = {
+	["Cappuccino Assassino"] = {
 		Tier = 5,
 		Price = 3125,
 		EnergyPerDrop = 50,
 		DropInterval = 3,
-		MergeInto = "BrrBrrPatapim",
+		MergeInto = "Chimpanzini Bananini",
 	},
-	["BrrBrrPatapim"] = {
+	["Chimpanzini Bananini"] = {
 		Tier = 6,
 		Price = 15625,
 		EnergyPerDrop = 125,
 		DropInterval = 3,
-		MergeInto = "LiriliLarila",
+		MergeInto = "Bombardiro Crocodilo",
 	},
-	["LiriliLarila"] = {
+	["Bombardiro Crocodilo"] = {
 		Tier = 7,
 		Price = 78125,
 		EnergyPerDrop = 310,
 		DropInterval = 3,
-		MergeInto = "ChimpanziniBananini",
+		MergeInto = "Chimpanzini Spiderini",
 	},
-	["ChimpanziniBananini"] = {
+	["Chimpanzini Spiderini"] = {
 		Tier = 8,
 		Price = 390625,
 		EnergyPerDrop = 780,
 		DropInterval = 3,
-		MergeInto = "BombombiniGusini",
+		MergeInto = "Tralalero Tralala",
 	},
-	["BombombiniGusini"] = {
+	["Tralalero Tralala"] = {
 		Tier = 9,
 		Price = 1953125,
 		EnergyPerDrop = 1950,
 		DropInterval = 3,
-		MergeInto = "TrulimeroTrulicina",
+		MergeInto = "Tung Tung Tung Sahur",
 	},
-	["TrulimeroTrulicina"] = {
+	["Tung Tung Tung Sahur"] = {
 		Tier = 10,
 		Price = 9765625,
 		EnergyPerDrop = 4900,
 		DropInterval = 3,
-		MergeInto = "OdinDinDinDun",
+		MergeInto = "67",
 	},
-	["OdinDinDinDun"] = {
+	["67"] = {
 		Tier = 11,
 		Price = 48828125,
 		EnergyPerDrop = 12250,
 		DropInterval = 3,
-		MergeInto = "BonecaAmbalabu",
+		MergeInto = "Dragon Cannelloni",
 	},
-	["BonecaAmbalabu"] = {
+	["Dragon Cannelloni"] = {
 		Tier = 12,
 		Price = 244140625,
 		EnergyPerDrop = 30600,
 		DropInterval = 3,
-		MergeInto = "FrigoCamelo",
+		MergeInto = "Garama and Madundung",
 	},
-	["FrigoCamelo"] = {
+	["Garama and Madundung"] = {
 		Tier = 13,
 		Price = 1220703125,
 		EnergyPerDrop = 76500,
 		DropInterval = 3,
-		MergeInto = "GirafaCelestre",
+		MergeInto = "Strawberry Elephant",
 	},
-	["GirafaCelestre"] = {
+	["Strawberry Elephant"] = {
 		Tier = 14,
 		Price = 6103515625,
 		EnergyPerDrop = 191000,
 		DropInterval = 3,
-		MergeInto = "TrenostruzzoTurbo",
+		MergeInto = "La Grande Combinasion",
 	},
-	["TrenostruzzoTurbo"] = {
+	["La Grande Combinasion"] = {
 		Tier = 15,
 		Price = 30517578125,
 		EnergyPerDrop = 478000,
@@ -117,9 +116,9 @@ GameConfig.Brainrots = {
 }
 
 GameConfig.BrainrotOrder = {
-	"Tralalero", "TrippiTroppi", "BombardiroCrocodilo", "CappuccinoAssassino", "TungTungSahur",
-	"BrrBrrPatapim", "LiriliLarila", "ChimpanziniBananini", "BombombiniGusini", "TrulimeroTrulicina",
-	"OdinDinDinDun", "BonecaAmbalabu", "FrigoCamelo", "GirafaCelestre", "TrenostruzzoTurbo",
+	"Noobini Pizzanini", "Tim Cheese", "Trippi Troppi", "Trippi Troppi Troppa Trippa", "Cappuccino Assassino",
+	"Chimpanzini Bananini", "Bombardiro Crocodilo", "Chimpanzini Spiderini", "Tralalero Tralala", "Tung Tung Tung Sahur",
+	"67", "Dragon Cannelloni", "Garama and Madundung", "Strawberry Elephant", "La Grande Combinasion",
 }
 
 -- Placeholder-model tint per tier, so identical placeholder blocks are still visually

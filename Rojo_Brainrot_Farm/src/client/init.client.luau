@@ -198,7 +198,7 @@ end)
 Remotes.RequestStats:FireServer()
 
 -- Example client-side call (wire this to a real button later):
--- Remotes.BuyBrainrot:FireServer("Tralalero")
+-- Remotes.BuyBrainrot:FireServer("Noobini Pizzanini")
 
 print("[Client] Connected. Known brainrot tiers:")
 for _, name in ipairs(GameConfig.BrainrotOrder) do

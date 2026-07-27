@@ -221,11 +221,11 @@ local function ensureMergeBillboard(platform: Instance)
 end
 
 -- Merges every complete group of GameConfig.MergeRequirement, at EVERY tier, cascading all
--- the way up to tier 5 in one call. GameConfig.BrainrotOrder lists tiers low-to-high, and this
+-- the way up to tier 15 in one call. GameConfig.BrainrotOrder lists tiers low-to-high, and this
 -- drains a tier's triples into the next tier before moving on to process that next tier --
--- so 9 owned Tralalero (tier 1) becomes 3 TrippiTroppi (tier 2) becomes 1 BombardiroCrocodilo
--- (tier 3), all within this single pass, since each tier's newly-created entries are already
--- in data.OwnedBrainrots by the time we get to processing that tier.
+-- so 9 owned tier-1 brainrots become 3 tier-2 becomes 1 tier-3, all within this single pass,
+-- since each tier's newly-created entries are already in data.OwnedBrainrots by the time we
+-- get to processing that tier.
 local function mergeAllPossible(data): number
 	local mergeCount = 0
 	for _, brainrotName in ipairs(GameConfig.BrainrotOrder) do

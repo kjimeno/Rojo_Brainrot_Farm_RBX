@@ -15,7 +15,7 @@ local DEFAULT_DATA = {
 	SiloEnergy = 0,
 	PendingCash = 0,
 	ConversionLevel = 0,
-	OwnedBrainrots = {}, -- { {Name = "Tralalero", Id = "uuid"}, ... }
+	OwnedBrainrots = {}, -- { {Name = "Noobini Pizzanini", Id = "uuid"}, ... }
 }
 
 local function deepCopy(t)

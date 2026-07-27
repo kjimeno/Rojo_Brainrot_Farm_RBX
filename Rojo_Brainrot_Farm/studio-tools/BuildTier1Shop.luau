@@ -35,7 +35,7 @@ for i, quantity in ipairs(QUANTITIES) do
 	platform.Material = Enum.Material.Neon
 	platform.Color = Color3.fromRGB(170, 0, 255)
 	platform.Position = BASE_POSITION + Vector3.new((i - 1) * SPACING, 0, 0)
-	platform:SetAttribute("BrainrotName", "Tralalero")
+	platform:SetAttribute("BrainrotName", "Noobini Pizzanini")
 	platform:SetAttribute("Quantity", quantity)
 	platform.Parent = shopFolder
 end

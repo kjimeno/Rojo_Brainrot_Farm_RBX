@@ -5,8 +5,8 @@
 -- stall entirely with placeholder Parts -- no ProximityPrompt or client UI wiring needed.
 --
 -- Each platform is one Part carrying attributes directly on itself:
---   BrainrotName = "Tralalero"   -- required
---   Quantity     = 5             -- optional, defaults to 1 (e.g. the 1x/5x/25x/100x tier-1 stalls)
+--   BrainrotName = "Noobini Pizzanini"   -- required
+--   Quantity     = 5                     -- optional, defaults to 1 (e.g. the 1x/5x/25x/100x tier-1 stalls)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,7 +18,7 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local EnergyConversionSystem = require(script.Parent.EnergyConversionSystem)
 local MergeSystem = require(script.Parent.MergeSystem)
 
--- Floating "Buy 5x Tralalero / 25 cash" text above a shop platform. Created once per
+-- Floating "Buy 5x Noobini Pizzanini / 25 cash" text above a shop platform. Created once per
 -- platform, safe to re-run on server start.
 local function ensureShopBillboard(platform: BasePart, brainrotName: string, quantity: number)
 	if platform:FindFirstChild("ShopBillboard") then return end
