@@ -471,6 +471,51 @@ homeButton.Activated:Connect(function()
 	root.CFrame = spawnLocation.CFrame + Vector3.new(0, 5, 0)
 end)
 
+-- ===== Brainrot spawn hop: a little cosmetic bounce played whenever a brainrot spawns energy =====
+-- Played entirely client-side. The server used to animate this itself, but Roblox throttles
+-- CFrame replication for Anchored parts much harder than physics-simulated ones, so a
+-- server-driven hop read as choppy no matter how smoothly the math was computed -- the server
+-- now just tells every client "hop this model" (Remotes.BrainrotHop:FireAllClients) and each
+-- client animates its own already-replicated copy locally, once per Heartbeat, no network cost.
+local HOP_HEIGHT = 1.5 -- studs
+local HOP_DURATION = 0.3 -- seconds, up and back down
+
+local function playBrainrotHop(model: Model)
+	if not model or not model.Parent then return end
+
+	local standPlatform = model:FindFirstChild("StandPlatform")
+
+	local parts = {}
+	for _, descendant in ipairs(model:GetDescendants()) do
+		if descendant:IsA("BasePart") and descendant ~= standPlatform and (not standPlatform or not descendant:IsDescendantOf(standPlatform)) then
+			table.insert(parts, { part = descendant, originalCFrame = descendant.CFrame })
+		end
+	end
+	if #parts == 0 then return end
+
+	task.spawn(function()
+		local startTime = os.clock()
+		while model.Parent do
+			local alpha = math.clamp((os.clock() - startTime) / HOP_DURATION, 0, 1)
+			local heightOffset = math.sin(alpha * math.pi) * HOP_HEIGHT
+			for _, entry in ipairs(parts) do
+				if entry.part.Parent then
+					entry.part.CFrame = entry.originalCFrame + Vector3.new(0, heightOffset, 0)
+				end
+			end
+			if alpha >= 1 then break end
+			RunService.Heartbeat:Wait()
+		end
+		for _, entry in ipairs(parts) do
+			if entry.part.Parent then
+				entry.part.CFrame = entry.originalCFrame
+			end
+		end
+	end)
+end
+
+Remotes.BrainrotHop.OnClientEvent:Connect(playBrainrotHop)
+
 -- Ask the server for our actual loaded stats now that we're listening for the reply above --
 -- without this, everything just sits at these scripts' own built-in defaults (0, "$0", etc.)
 -- until some other action (buying, depositing, ...) happens to push an update.

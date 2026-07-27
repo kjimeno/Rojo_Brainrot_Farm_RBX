@@ -232,6 +232,13 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			local primaryPart = brainrotModel.PrimaryPart
 			if not primaryPart then continue end
 
+			-- The hop itself is played client-side (see init.client.luau) -- Roblox throttles
+			-- CFrame replication for Anchored parts much harder than physics-simulated ones, so
+			-- animating it here on the server and letting it replicate reads as choppy no matter
+			-- how smoothly it's computed. This just tells every client "hop this model" and each
+			-- one animates its own already-replicated copy locally, with no per-frame network cost.
+			Remotes.BrainrotHop:FireAllClients(brainrotModel)
+
 			local energyTemplate = getEnergyTemplate(config.Tier)
 			local energyPart = energyTemplate:Clone()
 			tintEnergyPart(energyPart, config.Tier)

@@ -12,6 +12,7 @@ local REMOTE_NAMES = {
 	"UpgradeConversion",
 	"StatsUpdate",
 	"RequestStats",
+	"BrainrotHop",
 }
 
 local Remotes = {}
