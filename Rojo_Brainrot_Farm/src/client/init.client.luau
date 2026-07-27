@@ -189,10 +189,17 @@ createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy", false)
 local CASH_BURST_MIN_COUNT = 5
 local CASH_BURST_MAX_COUNT = 6
 local CASH_BURST_ICON_SIZE = UDim2.new(1, 0, 1, 0)
-local CASH_BURST_MIN_DISTANCE = 10
-local CASH_BURST_MAX_DISTANCE = 15
-local CASH_BURST_POP_DURATION = 0.35
-local CASH_BURST_RETURN_DURATION = 0.4
+local CASH_BURST_MIN_DISTANCE = 16
+local CASH_BURST_MAX_DISTANCE = 20
+local CASH_BURST_POP_DURATION = 0.7
+local CASH_BURST_MIN_ELEVATION_DEGREES = 15 -- burst direction is never shallower than this above the horizon
+local CASH_BURST_GRAVITY = 25 -- studs/sec^2; slight, not full engine gravity -- just enough to arc the pop
+local CASH_BURST_RETURN_BASE_RATE = 3 -- starting catch-up rate right when the return begins -- slow
+local CASH_BURST_RETURN_ACCEL = 10 -- how fast that catch-up rate itself grows per second (exponential) -- ramps up hard
+local CASH_BURST_RETURN_ARRIVE_DISTANCE = 0.7 -- studs; disappears once actually this close to the player
+local CASH_BURST_RETURN_TIMEOUT = 2 -- safety cutoff in seconds so an edge case (e.g. character gone) can't loop forever
+local CASH_TRAIL_WIDTH_STUDS = 0.9 -- total ribbon width at its widest, right at the icon
+local CASH_TRAIL_TRANSPARENCY = 0.5 -- 0 = fully solid, 1 = fully invisible, for most of the ribbon's length
 
 local cashBurstIconsFolder = Instance.new("Folder")
 cashBurstIconsFolder.Name = "CashBurstIcons"
@@ -230,7 +237,7 @@ local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
 
 	local image = Instance.new("ImageLabel")
 	image.BackgroundTransparency = 1
-	image.Size = UDim2.new(1, 0, 1, 0)
+	image.Size = UDim2.new(1.3, 0, 1.3, 0)
 	image.Image = iconImage
 	image.Parent = billboard
 
@@ -238,11 +245,11 @@ local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
 	-- capped by how far apart these two attachments are -- too close together (a few tenths of
 	-- a stud) and the ribbon technically exists but is too thin to see, so keep real separation.
 	local trailAttachment0 = Instance.new("Attachment")
-	trailAttachment0.Position = Vector3.new(-0.75, 0, 0)
+	trailAttachment0.Position = Vector3.new(-CASH_TRAIL_WIDTH_STUDS / 2, 0, 0)
 	trailAttachment0.Parent = anchor
 
 	local trailAttachment1 = Instance.new("Attachment")
-	trailAttachment1.Position = Vector3.new(0.75, 0, 0)
+	trailAttachment1.Position = Vector3.new(CASH_TRAIL_WIDTH_STUDS / 2, 0, 0)
 	trailAttachment1.Parent = anchor
 
 	local trail = Instance.new("Trail")
@@ -250,9 +257,13 @@ local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
 	trail.Attachment1 = trailAttachment1
 	trail.Lifetime = 0.5
 	trail.MinLength = 0
-	trail.Color = ColorSequence.new(Color3.fromRGB(255, 236, 130))
+	trail.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+	-- Mostly at CASH_TRAIL_TRANSPARENCY along the whole ribbon, only fading further right at the
+	-- very tip -- the sharp point comes from WidthScale collapsing to 0, not from a soft
+	-- transparency fade blurring the shape.
 	trail.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.4),
+		NumberSequenceKeypoint.new(0, CASH_TRAIL_TRANSPARENCY),
+		NumberSequenceKeypoint.new(0.85, math.min(CASH_TRAIL_TRANSPARENCY + 0.1, 1)),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	trail.WidthScale = NumberSequence.new({
@@ -261,35 +272,58 @@ local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
 	})
 	trail.Parent = anchor
 
-	-- Fully random direction (not just up/outward) -- pick a random point in a cube and
-	-- normalize it into a random unit direction, then scale to a random burst distance.
-	local randomDir = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5)
-	if randomDir.Magnitude < 0.001 then
-		randomDir = Vector3.new(0, 1, 0)
-	end
-	randomDir = randomDir.Unit
+	-- Random direction, but constrained to never be shallower than CASH_BURST_MIN_ELEVATION_DEGREES
+	-- above the horizon -- picks a random compass direction (azimuth) and a random elevation
+	-- angle between that minimum and straight up, instead of a fully random point in a cube.
+	local azimuth = math.random() * 2 * math.pi
+	local minElevation = math.rad(CASH_BURST_MIN_ELEVATION_DEGREES)
+	local elevation = minElevation + math.random() * (math.rad(90) - minElevation)
+	local horizontalRadius = math.cos(elevation)
+	local randomDir = Vector3.new(
+		math.cos(azimuth) * horizontalRadius,
+		math.sin(elevation),
+		math.sin(azimuth) * horizontalRadius
+	)
+
 	local burstDistance = CASH_BURST_MIN_DISTANCE + math.random() * (CASH_BURST_MAX_DISTANCE - CASH_BURST_MIN_DISTANCE)
-	local burstCFrame = originCFrame + (randomDir * burstDistance)
 
-	local popTween = TweenService:Create(
-		anchor,
-		TweenInfo.new(CASH_BURST_POP_DURATION, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ CFrame = burstCFrame }
-	)
-	popTween:Play()
-	popTween.Completed:Wait()
+	-- Simulates the pop with slight gravity (an actual velocity + downward acceleration each
+	-- frame) instead of a straight-line tween, so it arcs like a real toss instead of flying
+	-- dead straight to its target point.
+	local velocity = randomDir * (burstDistance / CASH_BURST_POP_DURATION)
+	local popStart = os.clock()
+	while os.clock() - popStart < CASH_BURST_POP_DURATION do
+		local dt = RunService.RenderStepped:Wait()
+		velocity = velocity - Vector3.new(0, CASH_BURST_GRAVITY * dt, 0)
+		anchor.CFrame = CFrame.new(anchor.Position + velocity * dt)
+	end
 
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local returnCFrame = (root and root.CFrame) or burstCFrame
+	-- Chases the character's ACTUAL live position every frame, but the catch-up rate itself
+	-- isn't fixed -- it starts at CASH_BURST_RETURN_BASE_RATE (slow) and grows exponentially
+	-- over elapsed return time at CASH_BURST_RETURN_ACCEL, so the icon drifts lazily at first
+	-- and then rockets in to meet you. Never disappears until it's actually reached you.
+	local returnStart = os.clock()
+	while true do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root then
+			break
+		end
 
-	local returnTween = TweenService:Create(
-		anchor,
-		TweenInfo.new(CASH_BURST_RETURN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-		{ CFrame = returnCFrame }
-	)
-	returnTween:Play()
-	returnTween.Completed:Wait()
+		local currentPos = anchor.Position
+		local targetPos = root.Position
+		local distance = (targetPos - currentPos).Magnitude
+		local elapsed = os.clock() - returnStart
+		if distance <= CASH_BURST_RETURN_ARRIVE_DISTANCE or elapsed > CASH_BURST_RETURN_TIMEOUT then
+			anchor.CFrame = CFrame.new(targetPos)
+			break
+		end
+
+		local dt = RunService.RenderStepped:Wait()
+		local effectiveRate = CASH_BURST_RETURN_BASE_RATE * math.exp(CASH_BURST_RETURN_ACCEL * elapsed)
+		local alpha = 1 - math.exp(-effectiveRate * dt)
+		anchor.CFrame = CFrame.new(currentPos:Lerp(targetPos, math.min(alpha, 1)))
+	end
 
 	trail.Enabled = false
 	anchor:Destroy()
