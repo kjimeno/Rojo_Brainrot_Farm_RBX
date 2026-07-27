@@ -69,7 +69,7 @@ end
 -- Where each energy drop spawns relative to the brainrot that produced it: this many studs
 -- out in front of it (along whichever way its model is actually facing) and this many studs
 -- up. Tweak these two to taste once you see it against your model sizes.
-local ENERGY_DROP_DISTANCE = -5
+local ENERGY_DROP_DISTANCE = 5
 local ENERGY_DROP_HEIGHT = 2
 
 -- Occupancy is derived live from what's actually parented to the slot (each brainrot model
@@ -120,6 +120,14 @@ end
 
 local function slotCFrame(slot: Instance, layer: number): CFrame
 	return slot.CFrame + Vector3.new(0, layer * GameConfig.StackLayerHeight, 0)
+end
+
+-- The slot's own placement CFrame, further rotated by that brainrot's FacingOffset (if any)
+-- so a model whose PrimaryPart doesn't match its visual front still ends up facing correctly.
+local function brainrotSpawnCFrame(slot: Instance, layer: number, brainrotName: string): CFrame
+	local config = GameConfig.Brainrots[brainrotName]
+	local facingOffset = (config and config.FacingOffset) or 0
+	return slotCFrame(slot, layer) * CFrame.Angles(0, math.rad(facingOffset), 0)
 end
 
 -- Fallback size/color for the generated placeholder stand platform, only used when
@@ -174,20 +182,6 @@ local function addStandPlatform(model: Model, slot: Instance, layer: number)
 	end
 
 	platform.Parent = model
-end
-
--- Tints every part of a (placeholder) brainrot model by its tier so identical placeholder
--- blocks are still visually distinguishable.
-local function colorModelByTier(model: Model, brainrotName: string)
-	local config = GameConfig.Brainrots[brainrotName]
-	local color = config and GameConfig.TierColors[config.Tier]
-	if not color then return end
-
-	for _, part in ipairs(model:GetDescendants()) do
-		if part:IsA("BasePart") then
-			part.Color = color
-		end
-	end
 end
 
 -- Stacked brainrots sit mid-air above other slots once layer > 0, so they need to be
@@ -336,10 +330,9 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 				local model = template:Clone()
 				model:SetAttribute("BrainrotId", brainrotId)
 				model:SetAttribute("OwnerUserId", player.UserId)
-				colorModelByTier(model, brainrotName)
 				anchorModel(model)
 				if model.PrimaryPart then
-					model:SetPrimaryPartCFrame(slotCFrame(slot, layer :: number))
+					model:SetPrimaryPartCFrame(brainrotSpawnCFrame(slot, layer :: number, brainrotName))
 				end
 				model.Parent = slot
 				addStandPlatform(model, slot, layer :: number)
@@ -397,10 +390,9 @@ local function repackPlot(player: Player, plot: Instance, data)
 			local model = template:Clone()
 			model:SetAttribute("BrainrotId", entry.Id)
 			model:SetAttribute("OwnerUserId", player.UserId)
-			colorModelByTier(model, entry.Name)
 			anchorModel(model)
 			if model.PrimaryPart then
-				model:SetPrimaryPartCFrame(slotCFrame(slot, layer))
+				model:SetPrimaryPartCFrame(brainrotSpawnCFrame(slot, layer, entry.Name))
 			end
 			model.Parent = slot
 			addStandPlatform(model, slot, layer)
@@ -419,7 +411,6 @@ end)
 return {
 	StartEnergyLoop = startEnergyLoop,
 	BuyBrainrot = buyBrainrot,
-	ColorModelByTier = colorModelByTier,
 	AnchorModel = anchorModel,
 	RepackPlot = repackPlot,
 }

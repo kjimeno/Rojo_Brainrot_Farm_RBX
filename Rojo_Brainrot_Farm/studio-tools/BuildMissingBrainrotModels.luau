@@ -6,10 +6,10 @@
 --
 -- Fills in any ServerStorage/BrainrotModels/<Name> folder that's missing for a name in
 -- GameConfig.Brainrots, by cloning whichever placeholder Model already exists there (e.g.
--- your Noobini Pizzanini block) and renaming the clone. The tier color/tint is applied automatically
--- at spawn time regardless of the model's own geometry (see BrainrotSpawner.colorModelByTier),
--- so reusing the same block for every tier is fine visually -- swap in real models later
--- whenever you want, same folder names.
+-- your Noobini Pizzanini block) and renaming the clone. Note: BrainrotSpawner no longer
+-- auto-tints models by tier (removed once real models started replacing the placeholders),
+-- so every tier filled in this way will look visually identical until you swap in real
+-- models or color them yourself -- this is just meant to unblock testing, not a final look.
 --
 -- Safe to re-run: it only fills in names that don't already have a model, never touches or
 -- duplicates ones that already exist.

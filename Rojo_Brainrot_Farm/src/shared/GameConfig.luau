@@ -7,6 +7,11 @@ local GameConfig = {}
 -- ============ BRAINROT TIERS ============
 -- Price keeps the x5-per-tier pattern you set for tiers 1-5; EnergyPerDrop keeps roughly the
 -- same ~2.5x-per-tier curve. Just the names changed here -- values are unchanged per tier.
+--
+-- FacingOffset (optional, degrees) corrects a model whose PrimaryPart doesn't actually face
+-- the way the character visually looks -- common with imported models that weren't authored
+-- with "front = local -Z". Rotates the model on top of the slot's own orientation at spawn
+-- time; defaults to 0 (no correction) for any tier that doesn't set it.
 GameConfig.Brainrots = {
 	["Noobini Pizzanini"] = {
 		Tier = 1,
@@ -14,6 +19,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 1,
 		DropInterval = 3,
 		MergeInto = "Tim Cheese",
+		FacingOffset = 180,
 	},
 	["Tim Cheese"] = {
 		Tier = 2,
@@ -21,6 +27,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 3,
 		DropInterval = 3,
 		MergeInto = "Trippi Troppi",
+		FacingOffset = 180,
 	},
 	["Trippi Troppi"] = {
 		Tier = 3,
@@ -28,6 +35,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 8,
 		DropInterval = 3,
 		MergeInto = "Trippi Troppi Troppa Trippa",
+		FacingOffset = 180,
 	},
 	["Trippi Troppi Troppa Trippa"] = {
 		Tier = 4,
@@ -35,6 +43,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 20,
 		DropInterval = 3,
 		MergeInto = "Cappuccino Assassino",
+		FacingOffset = 180,
 	},
 	["Cappuccino Assassino"] = {
 		Tier = 5,
@@ -42,6 +51,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 50,
 		DropInterval = 3,
 		MergeInto = "Chimpanzini Bananini",
+		FacingOffset = 180,
 	},
 	["Chimpanzini Bananini"] = {
 		Tier = 6,
@@ -49,6 +59,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 125,
 		DropInterval = 3,
 		MergeInto = "Bombardiro Crocodilo",
+		FacingOffset = 180,
 	},
 	["Bombardiro Crocodilo"] = {
 		Tier = 7,
@@ -56,6 +67,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 310,
 		DropInterval = 3,
 		MergeInto = "Chimpanzini Spiderini",
+		FacingOffset = 180,
 	},
 	["Chimpanzini Spiderini"] = {
 		Tier = 8,
@@ -63,6 +75,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 780,
 		DropInterval = 3,
 		MergeInto = "Tralalero Tralala",
+		FacingOffset = 180,
 	},
 	["Tralalero Tralala"] = {
 		Tier = 9,
@@ -70,6 +83,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 1950,
 		DropInterval = 3,
 		MergeInto = "Tung Tung Tung Sahur",
+		FacingOffset = 180,
 	},
 	["Tung Tung Tung Sahur"] = {
 		Tier = 10,
@@ -77,6 +91,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 4900,
 		DropInterval = 3,
 		MergeInto = "67",
+		FacingOffset = 180,
 	},
 	["67"] = {
 		Tier = 11,
@@ -84,6 +99,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 12250,
 		DropInterval = 3,
 		MergeInto = "Dragon Cannelloni",
+		FacingOffset = 180,
 	},
 	["Dragon Cannelloni"] = {
 		Tier = 12,
@@ -91,6 +107,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 30600,
 		DropInterval = 3,
 		MergeInto = "Garama and Madundung",
+		FacingOffset = 180,
 	},
 	["Garama and Madundung"] = {
 		Tier = 13,
@@ -98,6 +115,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 76500,
 		DropInterval = 3,
 		MergeInto = "Strawberry Elephant",
+		FacingOffset = 180,
 	},
 	["Strawberry Elephant"] = {
 		Tier = 14,
@@ -105,6 +123,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 191000,
 		DropInterval = 3,
 		MergeInto = "La Grande Combinasion",
+		FacingOffset = 180,
 	},
 	["La Grande Combinasion"] = {
 		Tier = 15,
@@ -112,6 +131,7 @@ GameConfig.Brainrots = {
 		EnergyPerDrop = 478000,
 		DropInterval = 3,
 		MergeInto = nil, -- max tier for now
+		FacingOffset = 180,
 	},
 }
 
