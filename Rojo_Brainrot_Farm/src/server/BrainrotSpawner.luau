@@ -72,6 +72,9 @@ end
 local ENERGY_DROP_DISTANCE = 5
 local ENERGY_DROP_HEIGHT = 2
 
+-- How long an uncollected physical energy part sticks around in the world before auto-cleanup.
+local ENERGY_PART_LIFETIME = 24
+
 -- Occupancy is derived live from what's actually parented to the slot (each brainrot model
 -- is parented directly to the slot it's sitting on), so there's no separate "Occupied" flag
 -- to fall out of sync with reality.
@@ -287,7 +290,7 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			-- No more scripted CFrame tweening down a conveyor -- your real conveyor belt will
 			-- move it via actual physics once it's built. This is just a cleanup timer so an
 			-- uncollected drop doesn't sit in the world forever.
-			task.delay(GameConfig.ConveyorTravelTime + 10, function()
+			task.delay(ENERGY_PART_LIFETIME, function()
 				if touchConnection then touchConnection:Disconnect() end
 				if energyPart.Parent and not collected then
 					energyPart:Destroy()
