@@ -74,6 +74,15 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 			MergeSystem.UpdateMergePlatform(plot, data)
 		end
 
+		-- The 100x shop platforms buy so many at once that they're almost guaranteed to complete
+		-- several merge groups immediately -- auto-merge everything possible right away instead
+		-- of leaving the player to walk over to the merge platform themselves. (AutoMergeAll
+		-- re-fetches/updates the board and plot itself, so this is safe even though the block
+		-- above just did the same for the plain purchase case.)
+		if quantity >= 100 then
+			MergeSystem.AutoMergeAll(player)
+		end
+
 		print(("[Shop] %s bought %dx %s. Cash left: %d"):format(player.Name, quantity, brainrotName, data.Cash))
 	else
 		print(("[Shop] %s failed to buy %dx %s: %s"):format(player.Name, quantity, brainrotName, tostring(resultOrError)))

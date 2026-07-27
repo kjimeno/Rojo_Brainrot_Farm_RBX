@@ -297,6 +297,38 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 	end)
 end
 
+-- A bulk buy (e.g. the shop's 100x platforms) is meant to immediately cascade-merge afterward
+-- (see ShopPrompts.buyAt / MergeSystem.AutoMergeAll), so checking the raw incoming quantity
+-- against MaxBrainrotsPerPlot rejects purchases that would actually fit just fine once the
+-- guaranteed merges happen. This simulates the merge cascade on plain tier counts (not real
+-- IDs) to project the ACTUAL final resting count, so buying 100 of a low tier isn't blocked
+-- just because 100 don't fit on the grid before merging -- only a genuinely-too-large final
+-- count (e.g. buying huge amounts of an already-max-tier brainrot, which can't merge further)
+-- still gets rejected.
+local function simulateFinalCountAfterMerges(data, addName: string, addQuantity: number): number
+	local counts = {}
+	for _, entry in ipairs(data.OwnedBrainrots) do
+		counts[entry.Name] = (counts[entry.Name] or 0) + 1
+	end
+	counts[addName] = (counts[addName] or 0) + addQuantity
+
+	for _, tierName in ipairs(GameConfig.BrainrotOrder) do
+		local tierConfig = GameConfig.Brainrots[tierName]
+		local owned = counts[tierName] or 0
+		if tierConfig and tierConfig.MergeInto and owned >= GameConfig.MergeRequirement then
+			local groups = math.floor(owned / GameConfig.MergeRequirement)
+			counts[tierName] = owned - groups * GameConfig.MergeRequirement
+			counts[tierConfig.MergeInto] = (counts[tierConfig.MergeInto] or 0) + groups
+		end
+	end
+
+	local total = 0
+	for _, count in pairs(counts) do
+		total += count
+	end
+	return total
+end
+
 local function buyBrainrot(player: Player, brainrotName: string, quantity: number?)
 	quantity = quantity or 1
 
@@ -314,7 +346,7 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 	local plot = getPlayerPlot(player)
 	if not plot then return false, "No plot assigned" end
 
-	if #data.OwnedBrainrots + quantity > GameConfig.MaxBrainrotsPerPlot then
+	if simulateFinalCountAfterMerges(data, brainrotName, quantity) > GameConfig.MaxBrainrotsPerPlot then
 		return false, "Not enough room on plot"
 	end
 

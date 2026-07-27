@@ -250,6 +250,34 @@ local function mergeAllPossible(data): number
 	return mergeCount
 end
 
+-- Merges every possible group across all tiers for `player`, repacks their plot, plays the
+-- burst effect, and notifies the client -- shared by the MergePlatform's touch handler and any
+-- other system (e.g. buying the 100x shop quantity) that wants the same "auto-merge everything
+-- you can" behavior. Returns how many merges happened (0 if nothing was mergeable).
+local function autoMergeAll(player: Player): number
+	local data = PlayerDataManager.Get(player)
+	if not data then return 0 end
+
+	local mergeCount = mergeAllPossible(data)
+	if mergeCount == 0 then return 0 end -- nothing mergeable at any tier, stay quiet
+
+	-- Re-looked-up rather than trusting a caller-provided plot: always repacks THIS player's
+	-- own plot, regardless of where the triggering action happened.
+	local plot = getPlayerPlot(player)
+	if plot then
+		-- Burst fires first so it's instant -- RepackPlot below rebuilds every brainrot model
+		-- on the whole plot, which can take a noticeable moment with a large inventory, and
+		-- shouldn't delay the visual feedback.
+		playMergeEffect(plot)
+		BrainrotSpawner.RepackPlot(player, plot, data)
+		updateMergePlatformState(plot, data)
+	end
+	Remotes.MergeBrainrots:FireClient(player, true, mergeCount)
+	print(("[Merge] %s merged %d group(s) across all tiers"):format(player.Name, mergeCount))
+
+	return mergeCount
+end
+
 local function setupMergePlatform(plot: Instance)
 	local platform = plot:FindFirstChild("MergePlatform")
 	if not platform then return end
@@ -259,26 +287,7 @@ local function setupMergePlatform(plot: Instance)
 	platform.Color = NOT_READY_COLOR
 
 	setupRepeatingTouch(platform, function(player)
-		local data = PlayerDataManager.Get(player)
-		if not data then return end
-
-		local mergeCount = mergeAllPossible(data)
-		if mergeCount == 0 then return end -- nothing mergeable at any tier, stay quiet
-
-		-- Re-looked-up rather than reusing the outer `plot` param: this platform's Touched
-		-- fires for whichever player steps on it, so this always repacks the TOUCHING
-		-- player's own plot, even if they're standing on someone else's platform.
-		local ownerPlot = getPlayerPlot(player)
-		if ownerPlot then
-			-- Burst fires first so it's instant -- RepackPlot below rebuilds every brainrot
-			-- model on the whole plot, which can take a noticeable moment with a large
-			-- inventory, and shouldn't delay the visual feedback.
-			playMergeEffect(ownerPlot)
-			BrainrotSpawner.RepackPlot(player, ownerPlot, data)
-			updateMergePlatformState(ownerPlot, data)
-		end
-		Remotes.MergeBrainrots:FireClient(player, true, mergeCount)
-		print(("[Merge] %s merged %d group(s) across all tiers"):format(player.Name, mergeCount))
+		autoMergeAll(player)
 	end)
 end
 
@@ -298,4 +307,5 @@ initAllMergePlatforms()
 return {
 	MergeBrainrots = mergeBrainrots,
 	UpdateMergePlatform = updateMergePlatformState,
+	AutoMergeAll = autoMergeAll,
 }
