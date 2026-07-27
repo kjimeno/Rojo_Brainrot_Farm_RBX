@@ -17,6 +17,7 @@ local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local EnergyConversionSystem = require(script.Parent.EnergyConversionSystem)
 local MergeSystem = require(script.Parent.MergeSystem)
+local setupRepeatingTouch = require(script.Parent.RepeatingTouch)
 
 -- Floating "Buy 5x Noobini Pizzanini / 25 cash" text above a shop platform. Created once per
 -- platform, safe to re-run on server start.
@@ -87,19 +88,8 @@ local function setupShopPlatform(platform: BasePart)
 	local quantity = platform:GetAttribute("Quantity") or 1
 	ensureShopBillboard(platform, brainrotName, quantity)
 
-	local onCooldown = {}
-
-	platform.Touched:Connect(function(hit)
-		local character = hit.Parent
-		local player = Players:GetPlayerFromCharacter(character)
-		if not player or onCooldown[player] then return end
-
-		onCooldown[player] = true
+	setupRepeatingTouch(platform, function(player)
 		buyAt(platform, player, brainrotName, quantity)
-
-		task.delay(1, function()
-			onCooldown[player] = nil
-		end)
 	end)
 end
 

@@ -11,6 +11,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
+local setupRepeatingTouch = require(script.Parent.RepeatingTouch)
 
 local READY_COLOR = Color3.fromRGB(235, 219, 0)
 local NOT_READY_COLOR = Color3.fromRGB(163, 162, 165)
@@ -257,20 +258,12 @@ local function setupMergePlatform(plot: Instance)
 	ensureHitEffect(platform)
 	platform.Color = NOT_READY_COLOR
 
-	local onCooldown = {}
-
-	platform.Touched:Connect(function(hit)
-		local character = hit.Parent
-		local player = Players:GetPlayerFromCharacter(character)
-		if not player or onCooldown[player] then return end
-
+	setupRepeatingTouch(platform, function(player)
 		local data = PlayerDataManager.Get(player)
 		if not data then return end
 
 		local mergeCount = mergeAllPossible(data)
 		if mergeCount == 0 then return end -- nothing mergeable at any tier, stay quiet
-
-		onCooldown[player] = true
 
 		-- Re-looked-up rather than reusing the outer `plot` param: this platform's Touched
 		-- fires for whichever player steps on it, so this always repacks the TOUCHING
@@ -286,10 +279,6 @@ local function setupMergePlatform(plot: Instance)
 		end
 		Remotes.MergeBrainrots:FireClient(player, true, mergeCount)
 		print(("[Merge] %s merged %d group(s) across all tiers"):format(player.Name, mergeCount))
-
-		task.delay(1, function()
-			onCooldown[player] = nil
-		end)
 	end)
 end
 

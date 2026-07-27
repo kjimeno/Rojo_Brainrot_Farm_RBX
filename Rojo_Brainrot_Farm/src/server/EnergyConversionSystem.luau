@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
+local setupRepeatingTouch = require(script.Parent.RepeatingTouch)
 
 local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
 local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
@@ -249,17 +250,9 @@ local function setupDepositArea(plot: Instance)
 
 	ensureDepositEffect(depositPart)
 
-	local playersInside = {}
-
-	depositPart.Touched:Connect(function(hit)
-		local character = hit.Parent
-		local player = Players:GetPlayerFromCharacter(character)
-		if not player or playersInside[player] then return end
-
+	setupRepeatingTouch(depositPart, function(player)
 		local data = PlayerDataManager.Get(player)
 		if not data or data.StoredEnergy <= 0 then return end
-
-		playersInside[player] = true
 
 		-- No cap -- move all carried energy into the silo in one go.
 		local depositedAmount = data.StoredEnergy
@@ -274,10 +267,6 @@ local function setupDepositArea(plot: Instance)
 			DepositedAmount = depositedAmount,
 		})
 		updateBoard(plot, data)
-
-		task.delay(1, function()
-			playersInside[player] = nil
-		end)
 	end)
 end
 
@@ -332,17 +321,10 @@ local function setupCoinVault(plot: Instance)
 
 	ensureCoinVaultBillboard(vault)
 
-	local onCooldown = {}
-
-	vault.Touched:Connect(function(hit)
-		local character = hit.Parent
-		local player = Players:GetPlayerFromCharacter(character)
-		if not player or onCooldown[player] then return end
-
+	setupRepeatingTouch(vault, function(player)
 		local data = PlayerDataManager.Get(player)
 		if not data or data.PendingCash <= 0 then return end
 
-		onCooldown[player] = true
 		local collectedAmount = data.PendingCash
 		data.Cash += data.PendingCash
 		data.PendingCash = 0
@@ -352,10 +334,6 @@ local function setupCoinVault(plot: Instance)
 		-- effect, only on the specific update where an actual vault collection just happened.
 		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash, PendingCash = 0, VaultCollectedAmount = collectedAmount })
 		updateBoard(plot, data)
-
-		task.delay(1, function()
-			onCooldown[player] = nil
-		end)
 	end)
 end
 
@@ -379,15 +357,7 @@ local function setupUpgradePlatform(plot: Instance)
 
 	ensureUpgradeBillboard(platform)
 
-	local onCooldown = {}
-
-	platform.Touched:Connect(function(hit)
-		local character = hit.Parent
-		local player = Players:GetPlayerFromCharacter(character)
-		if not player or onCooldown[player] then return end
-
-		onCooldown[player] = true
-
+	setupRepeatingTouch(platform, function(player)
 		local success, resultOrError = tryUpgradeConversion(player)
 		if success then
 			local data = PlayerDataManager.Get(player)
@@ -397,10 +367,6 @@ local function setupUpgradePlatform(plot: Instance)
 		else
 			print(("[Upgrade] %s failed to buy conversion upgrade: %s"):format(player.Name, tostring(resultOrError)))
 		end
-
-		task.delay(1, function()
-			onCooldown[player] = nil
-		end)
 	end)
 end
 
