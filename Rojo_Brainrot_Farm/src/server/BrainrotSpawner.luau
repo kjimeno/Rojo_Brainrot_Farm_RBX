@@ -221,13 +221,16 @@ local function addNameplate(model: Model, brainrotName: string)
 	label.Parent = billboard
 end
 
+local DROP_INTERVAL_JITTER = 0.2 -- +/- this fraction of DropInterval, randomized each drop, so identical brainrots don't all drop energy in lockstep
+
 local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotName: string, plot: Instance)
 	local config = GameConfig.Brainrots[brainrotName]
 	if not config then return end
 
 	task.spawn(function()
 		while brainrotModel.Parent and player.Parent do
-			task.wait(config.DropInterval)
+			local jitter = 1 + (math.random() * 2 - 1) * DROP_INTERVAL_JITTER
+			task.wait(config.DropInterval * jitter)
 
 			local primaryPart = brainrotModel.PrimaryPart
 			if not primaryPart then continue end
