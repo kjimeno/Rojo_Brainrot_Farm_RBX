@@ -185,11 +185,13 @@ local function addStandPlatform(model: Model, slot: Instance, layer: number)
 end
 
 -- Stacked brainrots sit mid-air above other slots once layer > 0, so they need to be
--- anchored or they'd just fall through/off the slot below them.
+-- anchored or they'd just fall through/off the slot below them. Also non-collidable so
+-- players (and other brainrots/energy drops) can't bump into or get stuck on them.
 local function anchorModel(model: Model)
 	for _, part in ipairs(model:GetDescendants()) do
 		if part:IsA("BasePart") then
 			part.Anchored = true
+			part.CanCollide = false
 		end
 	end
 end
