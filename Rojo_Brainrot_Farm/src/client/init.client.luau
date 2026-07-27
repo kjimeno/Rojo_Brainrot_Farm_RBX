@@ -75,6 +75,15 @@ end
 -- watch for in Remotes.StatsUpdate payloads (e.g. "Cash", "StoredEnergy"); `showBadgeOnDecrease`
 -- controls whether decreases get the floating badge callout too (Cash: yes, Energy: no).
 local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBadgeOnDecrease: boolean)
+	-- Icon's Size is scale-based, so its absolute pixel box changes shape as the window/viewport
+	-- ratio changes -- ScaleType.Fit keeps the image itself at its own real proportions inside
+	-- that box (letterboxing as needed) instead of stretching to fill whatever shape the box
+	-- ends up being. A UIAspectRatioConstraint would need to already know the image's correct
+	-- ratio to pin the box itself; this sidesteps that entirely by fixing it at the image level.
+	if icon:IsA("ImageLabel") or icon:IsA("ImageButton") then
+		(icon :: ImageLabel).ScaleType = Enum.ScaleType.Fit
+	end
+
 	local TransactionRoot = icon.main.Transactions
 
 	local AddTemplate = TransactionRoot.Add
