@@ -4,6 +4,7 @@
 -- and collecting the converted cash. Also drives the SurfaceGui "board".
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -13,6 +14,50 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
 local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
 local CASH_COLOR = Color3.fromRGB(60, 200, 100)
+
+-- Own rig, separate from the merge platform's HitEffect: ServerStorage/"Particle effects"/
+-- DepositEffect. Same "clone ONCE up front, then just :Emit() the existing copy" pattern as
+-- MergeSystem.luau's HitEffect -- see that file for why (a same-frame Clone()+Emit() can
+-- visibly lag while the client is still catching up on the new instance existing at all).
+local DEPOSIT_EFFECT_BURST_COUNT = 1
+local particleEffectsFolder = ServerStorage:FindFirstChild("Particle effects")
+local depositEffectTemplate = particleEffectsFolder and particleEffectsFolder:FindFirstChild("DepositEffect")
+
+local function ensureDepositEffect(platform: Instance)
+	if not depositEffectTemplate then return end
+	if platform:FindFirstChild("DepositEffect") then return end
+
+	local effect = depositEffectTemplate:Clone()
+	-- PivotTo/GetPivot instead of .CFrame -- works whether your rig is a single Part or a
+	-- multi-part Model (Models don't have a settable .CFrame at all).
+	effect:PivotTo(platform:GetPivot())
+
+	local emitterCount = 0
+	for _, descendant in ipairs(effect:GetDescendants()) do
+		if descendant:IsA("ParticleEmitter") then
+			descendant.Enabled = false
+			emitterCount += 1
+		end
+	end
+	print(("[EnergyConversionSystem] DepositEffect set up on %s with %d ParticleEmitter(s)"):format(platform:GetFullName(), emitterCount))
+
+	effect.Parent = platform
+end
+
+-- Per-emitter burst count: set a "BurstCount" number attribute directly on any ParticleEmitter
+-- inside DepositEffect (in Studio) to make that one emit more or fewer particles than the
+-- others -- falls back to DEPOSIT_EFFECT_BURST_COUNT for any emitter that doesn't have one set.
+local function playDepositEffect(platform: Instance)
+	local effect = platform:FindFirstChild("DepositEffect")
+	if not effect then return end
+
+	for _, descendant in ipairs(effect:GetDescendants()) do
+		if descendant:IsA("ParticleEmitter") then
+			local burstCount = descendant:GetAttribute("BurstCount") or DEPOSIT_EFFECT_BURST_COUNT
+			descendant:Emit(burstCount)
+		end
+	end
+end
 
 -- ===== 1. Energy collection =====
 -- Handled in BrainrotSpawner.luau via Tween.Completed instead of a Touched listener here —
@@ -202,6 +247,8 @@ local function setupDepositArea(plot: Instance)
 	local depositPart = plot:FindFirstChild("DepositArea")
 	if not depositPart then return end
 
+	ensureDepositEffect(depositPart)
+
 	local playersInside = {}
 
 	depositPart.Touched:Connect(function(hit)
@@ -218,6 +265,8 @@ local function setupDepositArea(plot: Instance)
 		local depositedAmount = data.StoredEnergy
 		data.SiloEnergy += data.StoredEnergy
 		data.StoredEnergy = 0
+
+		playDepositEffect(depositPart)
 
 		Remotes.StatsUpdate:FireClient(player, {
 			StoredEnergy = data.StoredEnergy,
