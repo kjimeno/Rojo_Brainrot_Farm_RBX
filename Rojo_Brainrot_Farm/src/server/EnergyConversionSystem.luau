@@ -292,10 +292,14 @@ local function setupCoinVault(plot: Instance)
 		if not data or data.PendingCash <= 0 then return end
 
 		onCooldown[player] = true
+		local collectedAmount = data.PendingCash
 		data.Cash += data.PendingCash
 		data.PendingCash = 0
 
-		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash, PendingCash = 0 })
+		-- VaultCollectedAmount is a one-off signal, not persisted state like the other fields --
+		-- the client uses it to trigger the "coins pop out of the vault and fly back to you"
+		-- effect, only on the specific update where an actual vault collection just happened.
+		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash, PendingCash = 0, VaultCollectedAmount = collectedAmount })
 		updateBoard(plot, data)
 
 		task.delay(1, function()

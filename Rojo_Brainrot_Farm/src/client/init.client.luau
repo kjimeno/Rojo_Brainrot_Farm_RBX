@@ -185,10 +185,137 @@ local Main = PlayerGui:WaitForChild("Main")
 createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true)
 createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy", false)
 
+-- ===== Cash collect burst: icons burst out of the CoinVault in the air, then fly straight to you =====
+local CASH_BURST_MIN_COUNT = 5
+local CASH_BURST_MAX_COUNT = 6
+local CASH_BURST_ICON_SIZE = UDim2.new(1, 0, 1, 0)
+local CASH_BURST_MIN_DISTANCE = 10
+local CASH_BURST_MAX_DISTANCE = 15
+local CASH_BURST_POP_DURATION = 0.35
+local CASH_BURST_RETURN_DURATION = 0.4
+
+local cashBurstIconsFolder = Instance.new("Folder")
+cashBurstIconsFolder.Name = "CashBurstIcons"
+cashBurstIconsFolder.Parent = workspace
+
+local function getMyPlot(): Instance?
+	local plotsFolder = workspace:FindFirstChild("Plots")
+	if not plotsFolder then return nil end
+	for _, plot in ipairs(plotsFolder:GetChildren()) do
+		if plot:GetAttribute("OwnerUserId") == player.UserId then
+			return plot
+		end
+	end
+	return nil
+end
+
+-- One flying icon: bursts from `originCFrame` outward into the air, then immediately flies
+-- straight to wherever the character currently is -- no stopping in between. Fine for it to
+-- pass in front of the character since AlwaysOnTop is on.
+local function playCashBurstIcon(originCFrame: CFrame, iconImage: string)
+	local anchor = Instance.new("Part")
+	anchor.Name = "CashBurstIcon"
+	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+	anchor.Transparency = 1
+	anchor.CanCollide = false
+	anchor.Anchored = true
+	anchor.CFrame = originCFrame
+	anchor.Parent = cashBurstIconsFolder
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = CASH_BURST_ICON_SIZE
+	billboard.AlwaysOnTop = true
+	billboard.Adornee = anchor
+	billboard.Parent = anchor
+
+	local image = Instance.new("ImageLabel")
+	image.BackgroundTransparency = 1
+	image.Size = UDim2.new(1, 0, 1, 0)
+	image.Image = iconImage
+	image.Parent = billboard
+
+	-- A real Trail draws a ribbon along the icon's actual motion path. Its rendered width is
+	-- capped by how far apart these two attachments are -- too close together (a few tenths of
+	-- a stud) and the ribbon technically exists but is too thin to see, so keep real separation.
+	local trailAttachment0 = Instance.new("Attachment")
+	trailAttachment0.Position = Vector3.new(-0.75, 0, 0)
+	trailAttachment0.Parent = anchor
+
+	local trailAttachment1 = Instance.new("Attachment")
+	trailAttachment1.Position = Vector3.new(0.75, 0, 0)
+	trailAttachment1.Parent = anchor
+
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = trailAttachment0
+	trail.Attachment1 = trailAttachment1
+	trail.Lifetime = 0.5
+	trail.MinLength = 0
+	trail.Color = ColorSequence.new(Color3.fromRGB(255, 236, 130))
+	trail.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.4),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	trail.WidthScale = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	trail.Parent = anchor
+
+	-- Fully random direction (not just up/outward) -- pick a random point in a cube and
+	-- normalize it into a random unit direction, then scale to a random burst distance.
+	local randomDir = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5)
+	if randomDir.Magnitude < 0.001 then
+		randomDir = Vector3.new(0, 1, 0)
+	end
+	randomDir = randomDir.Unit
+	local burstDistance = CASH_BURST_MIN_DISTANCE + math.random() * (CASH_BURST_MAX_DISTANCE - CASH_BURST_MIN_DISTANCE)
+	local burstCFrame = originCFrame + (randomDir * burstDistance)
+
+	local popTween = TweenService:Create(
+		anchor,
+		TweenInfo.new(CASH_BURST_POP_DURATION, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		{ CFrame = burstCFrame }
+	)
+	popTween:Play()
+	popTween.Completed:Wait()
+
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local returnCFrame = (root and root.CFrame) or burstCFrame
+
+	local returnTween = TweenService:Create(
+		anchor,
+		TweenInfo.new(CASH_BURST_RETURN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		{ CFrame = returnCFrame }
+	)
+	returnTween:Play()
+	returnTween.Completed:Wait()
+
+	trail.Enabled = false
+	anchor:Destroy()
+end
+
+local function playCashCollectBurst()
+	local plot = getMyPlot()
+	local vault = plot and plot:FindFirstChild("CoinVault")
+	if not vault then return end
+
+	local iconImage = Main.HUD.Left.Icon.Image
+	local count = math.random(CASH_BURST_MIN_COUNT, CASH_BURST_MAX_COUNT)
+
+	for _ = 1, count do
+		task.spawn(playCashBurstIcon, vault.CFrame, iconImage)
+	end
+end
+
 Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 	if stats.Cash ~= nil then
 		cash = stats.Cash
 		refreshAllShopPlatforms()
+	end
+
+	if stats.VaultCollectedAmount ~= nil and stats.VaultCollectedAmount > 0 then
+		playCashCollectBurst()
 	end
 end)
 
