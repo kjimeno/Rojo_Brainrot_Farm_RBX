@@ -354,14 +354,16 @@ end
 -- ===== Energy deposit rain: HUD energy icons fall down the screen when you deposit =====
 -- Purely a 2D ScreenGui effect (unlike the 3D cash burst) -- icons spawn just above the top
 -- edge at random horizontal spots and tween straight down past the bottom edge, then destroy.
-local ENERGY_DROP_MIN_COUNT = 10
-local ENERGY_DROP_MAX_COUNT = 14
-local ENERGY_DROP_ICON_SIZE = UDim2.new(0, 120, 0, 120)
+local ENERGY_DROP_MIN_COUNT = 6
+local ENERGY_DROP_MAX_COUNT = 9
+local ENERGY_DROP_ICON_SIZE = UDim2.new(0, 100, 0, 100)
 local ENERGY_DROP_FALL_MIN_DURATION = 1.6
 local ENERGY_DROP_FALL_MAX_DURATION = 2.4
-local ENERGY_DROP_STAGGER_MAX = 0.4 -- seconds; random delay before each icon starts falling, so they don't all move in lockstep
-local ENERGY_DROP_DRIFT_MAX = 0.10 -- scale units of sideways drift over the fall -- gives each icon its own diagonal angle instead of falling straight down
+local ENERGY_DROP_STAGGER_MAX = 0.7 -- seconds; random delay before each icon starts falling, so they don't all move in lockstep
+local ENERGY_DROP_DRIFT_MAX = 0.07 -- scale units of sideways drift over the fall -- gives each icon its own diagonal angle instead of falling straight down
 local ENERGY_DROP_ROTATION_MAX = 50 -- degrees; each icon also spins to a random amount as it falls
+local ENERGY_DROP_TOP_OFFSET = 140 -- pixels above the top edge icons spawn at -- a fixed pixel offset (not scale) so bigger icons stay fully hidden above the screen regardless of resolution
+local ENERGY_DROP_SLOT_JITTER = 0.35 -- fraction of each icon's evenly-spaced slot width it's allowed to randomly shift within, so the row looks natural instead of a rigid grid
 
 local energyDropGui = Instance.new("ScreenGui")
 energyDropGui.Name = "EnergyDropEffect"
@@ -369,7 +371,7 @@ energyDropGui.ResetOnSpawn = false
 energyDropGui.IgnoreGuiInset = true
 energyDropGui.Parent = PlayerGui
 
-local function playEnergyDropIcon(iconImage: string)
+local function playEnergyDropIcon(iconImage: string, startX: number)
 	local icon = Instance.new("ImageLabel")
 	icon.BackgroundTransparency = 1
 	icon.Size = ENERGY_DROP_ICON_SIZE
@@ -377,8 +379,7 @@ local function playEnergyDropIcon(iconImage: string)
 	icon.ScaleType = Enum.ScaleType.Fit -- preserves the image's real aspect ratio instead of stretching it to fill a square label
 	icon.AnchorPoint = Vector2.new(0.5, 0)
 
-	local startX = math.random()
-	icon.Position = UDim2.new(startX, 0, -0.05, 0)
+	icon.Position = UDim2.new(startX, 0, 0, -ENERGY_DROP_TOP_OFFSET)
 	icon.Parent = energyDropGui
 
 	task.wait(math.random() * ENERGY_DROP_STAGGER_MAX)
@@ -403,8 +404,15 @@ local function playEnergyDepositRain()
 	local iconImage = Main.HUD.Up.Icon.Image
 	local count = math.random(ENERGY_DROP_MIN_COUNT, ENERGY_DROP_MAX_COUNT)
 
-	for _ = 1, count do
-		task.spawn(playEnergyDropIcon, iconImage)
+	-- Evenly divides the screen width into `count` slots and gives each icon a small random
+	-- jitter within its own slot -- spread out on purpose, not left up to pure chance, so a big
+	-- batch can't randomly clump together on one side of the screen.
+	local slotWidth = 1 / count
+	for i = 1, count do
+		local slotCenter = (i - 0.5) * slotWidth
+		local jitter = (math.random() * 2 - 1) * (slotWidth * ENERGY_DROP_SLOT_JITTER)
+		local startX = math.clamp(slotCenter + jitter, 0, 1)
+		task.spawn(playEnergyDropIcon, iconImage, startX)
 	end
 end
 
