@@ -49,6 +49,10 @@ end
 
 -- Fires every ParticleEmitter under `platform`'s (already-existing, already-replicated)
 -- HitEffect once -- a "burst" rather than continuous emission.
+--
+-- Per-emitter burst count: set a "BurstCount" number attribute directly on any ParticleEmitter
+-- inside HitEffect (in Studio) to make that one emit more or fewer particles than the others --
+-- falls back to HIT_EFFECT_BURST_COUNT for any emitter that doesn't have one set.
 local function playMergeEffect(plot: Instance)
 	local platform = plot:FindFirstChild("MergePlatform")
 	if not platform then return end
@@ -58,7 +62,8 @@ local function playMergeEffect(plot: Instance)
 
 	for _, descendant in ipairs(effect:GetDescendants()) do
 		if descendant:IsA("ParticleEmitter") then
-			descendant:Emit(HIT_EFFECT_BURST_COUNT)
+			local burstCount = descendant:GetAttribute("BurstCount") or HIT_EFFECT_BURST_COUNT
+			descendant:Emit(burstCount)
 		end
 	end
 end
