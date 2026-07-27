@@ -6,7 +6,7 @@
 
 local Players = game:GetService("Players")
 
-local REPEAT_DEBOUNCE = 0.5 -- seconds between every repeat, for as long as they keep standing there
+local REPEAT_DEBOUNCE = 1.0 -- seconds between every repeat, for as long as they keep standing there
 
 -- Runs `action(player)` immediately when `player` touches `platform`, then keeps re-running it
 -- every REPEAT_DEBOUNCE seconds for as long as they're still touching it. Only one repeat loop
