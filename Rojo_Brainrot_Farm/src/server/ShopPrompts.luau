@@ -92,6 +92,8 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 		-- just keep silently failing every second while standing there wondering why.
 		if resultOrError == "No free slot on plot" or resultOrError == "Not enough room on plot" then
 			Remotes.ShopSpaceError:FireClient(player)
+		elseif resultOrError == "Not enough cash" then
+			Remotes.MoneyError:FireClient(player)
 		end
 	end
 end

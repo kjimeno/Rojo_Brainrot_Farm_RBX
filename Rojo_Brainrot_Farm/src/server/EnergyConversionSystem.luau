@@ -356,6 +356,9 @@ local function setupUpgradePlatform(plot: Instance)
 			print(("[Upgrade] %s bought conversion level %s"):format(player.Name, tostring(resultOrError)))
 		else
 			print(("[Upgrade] %s failed to buy conversion upgrade: %s"):format(player.Name, tostring(resultOrError)))
+			if resultOrError == "Not enough cash" then
+				Remotes.MoneyError:FireClient(player)
+			end
 		end
 	end)
 end

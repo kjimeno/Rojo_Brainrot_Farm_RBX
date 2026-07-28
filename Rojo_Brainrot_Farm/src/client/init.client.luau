@@ -667,77 +667,103 @@ end
 
 Remotes.PlatformPress.OnClientEvent:Connect(playPlatformPress)
 
--- ===== Shop space warning: "Not Enough Space, please merge (xN)" =====
--- Parented INSIDE Icon (a sibling of the floating "+N" gain texts), not under HUD.Up directly --
--- Up apparently lays its children out automatically (that's what was shifting the energy amount
--- text left when this was added as a sibling of Icon instead), so adding new stuff has to go
--- inside Icon's own free-form area instead of Up's managed one. Shows just below Icon's bottom
--- edge, with a ZIndex above the gain texts' own so it still renders on top of them (Sibling
--- ZIndexBehavior compares these as true siblings here, no "whole subtree" trick needed).
--- Every failed buy due to no room bumps the count and resets a fresh SPACE_ERROR_HOLD_DURATION
--- window before it starts fading -- RepeatingTouch means a player standing there gets one of
--- these per second, so it should feel alive the whole time they're stuck, then fade out shortly
--- after they actually stop failing.
-local SPACE_ERROR_HOLD_DURATION = 4 -- seconds of no new failures before it starts fading
-local SPACE_ERROR_FADE_DURATION = 0.5
+-- ===== HUD warning popup: "Not Enough Space, Please Merge (xN)" / "Not Enough Money (xN)" =====
+-- ONE shared label (parented INSIDE the Energy icon, a sibling of its floating "+N" gain texts,
+-- with a ZIndex above them so it still renders on top -- Sibling ZIndexBehavior compares these
+-- as true siblings) used for BOTH warning types, all at the same position. Each type keeps its
+-- own "xN" count, but they share one global reset token: whichever warning fires MOST RECENTLY
+-- immediately overwrites the label's text and invalidates any fade-out already scheduled by the
+-- other one, so a new warning always cuts off and replaces whatever was showing rather than the
+-- two stacking or fighting over the display. Every failure bumps its own count and resets a
+-- fresh HOLD_DURATION window before fading -- RepeatingTouch means a player standing there gets
+-- one of these per second, so it should feel alive the whole time they're stuck, then fade out
+-- shortly after failures actually stop.
+local WARNING_HOLD_DURATION = 4 -- seconds of no new failures (of ANY type) before it starts fading
+local WARNING_FADE_DURATION = 0.5
 
-local energyIcon = Main.HUD.Up.Icon
+local warningIcon = Main.HUD.Up.Icon
 
-local spaceErrorLabel = Instance.new("TextLabel")
-spaceErrorLabel.Name = "SpaceErrorLabel"
-spaceErrorLabel.BackgroundTransparency = 1
-spaceErrorLabel.AnchorPoint = Vector2.new(0.5, 0)
-spaceErrorLabel.Position = UDim2.new(0.5, 0, 1, 18)
-spaceErrorLabel.Size = UDim2.new(10, 0, 1.5, 0) --UDim2.new(2.6, 0, 0, 40)
-spaceErrorLabel.Font = Enum.Font.FredokaOne
-spaceErrorLabel.TextScaled = true
-spaceErrorLabel.TextColor3 = Color3.new(1, 1, 1)
-spaceErrorLabel.TextTransparency = 1
-spaceErrorLabel.TextStrokeTransparency = 1 -- always fully off -- the UIStroke below is the only visible outline now, so this doesn't double up
-spaceErrorLabel.Text = ""
-spaceErrorLabel.ZIndex = energyIcon.main.ZIndex + 10
-spaceErrorLabel.Parent = energyIcon
+local warningLabel = Instance.new("TextLabel")
+warningLabel.Name = "WarningLabel"
+warningLabel.BackgroundTransparency = 1
+warningLabel.AnchorPoint = Vector2.new(0.5, 0)
+warningLabel.Position = UDim2.new(0.5, 0, 1, 18)
+warningLabel.Size = UDim2.new(10, 0, 1.5, 0)
+warningLabel.Font = Enum.Font.FredokaOne
+warningLabel.TextScaled = true
+warningLabel.TextColor3 = Color3.new(1, 1, 1)
+warningLabel.TextTransparency = 1
+warningLabel.TextStrokeTransparency = 1 -- always fully off -- the UIStroke below is the only visible outline now, so this doesn't double up
+warningLabel.Text = ""
+warningLabel.ZIndex = warningIcon.main.ZIndex + 10
+warningLabel.Parent = warningIcon
 
 -- A UIStroke gives an adjustable Thickness, unlike the built-in TextStrokeTransparency outline
--- (fixed thickness, transparency-only) -- this is what actually makes the outline thicker.
-local spaceErrorStroke = Instance.new("UIStroke")
-spaceErrorStroke.Name = "SpaceErrorStroke"
-spaceErrorStroke.Color = Color3.new(0.1059, 0.1647, 0.2078)
-spaceErrorStroke.Thickness = 2
-spaceErrorStroke.Transparency = 0.1
-spaceErrorStroke.Parent = spaceErrorLabel
+-- (fixed thickness, transparency-only) -- this is what actually makes it thicker.
+local warningStroke = Instance.new("UIStroke")
+warningStroke.Name = "WarningStroke"
+warningStroke.Color = Color3.new(0.1059, 0.1647, 0.2078)
+warningStroke.Thickness = 2
+warningStroke.Transparency = 0.1
+warningStroke.Parent = warningLabel
 
-local spaceErrorCount = 0
-local spaceErrorResetToken = 0
+local warningResetToken = 0
+local activeWarningId = nil -- which trigger currently "owns" the shared label, if any
 
-local function showSpaceError()
-	spaceErrorCount += 1
-	spaceErrorLabel.Text = ("Not Enough Space, Please Merge (x%d)"):format(spaceErrorCount)
-	spaceErrorLabel.TextTransparency = 0
-	spaceErrorStroke.Transparency = 0
+-- Returns a trigger function with its OWN independent "xN" count, but writing to the single
+-- shared warningLabel/warningStroke above.
+--
+-- `id` distinguishes this trigger from any other sharing the same label. If a DIFFERENT id was
+-- displaying when this one fires, that other trigger's count resets to 0 immediately (via
+-- otherReset()) instead of only resetting whenever its own fade-out happens to run uninterrupted
+-- -- which it never does once cut off, so without this its count would just silently keep
+-- climbing in the background and reappear later as if it had never stopped.
+local function createWarningTrigger(id: string, textFormat: string)
+	local count = 0
+	local function resetCount()
+		count = 0
+	end
 
-	-- Bumping this token invalidates any fade-out already scheduled from an earlier failure --
-	-- when THIS delay elapses, it'll be the only one whose token still matches, so it's the only
-	-- one that actually fades. Every new failure effectively restarts the 3-second countdown.
-	spaceErrorResetToken += 1
-	local myToken = spaceErrorResetToken
-
-	task.delay(SPACE_ERROR_HOLD_DURATION, function()
-		if spaceErrorResetToken ~= myToken then return end
-
-		local fadeInfo = TweenInfo.new(SPACE_ERROR_FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		local fadeTween = TweenService:Create(spaceErrorLabel, fadeInfo, { TextTransparency = 1 })
-		TweenService:Create(spaceErrorStroke, fadeInfo, { Transparency = 1 }):Play()
-		fadeTween:Play()
-		fadeTween.Completed:Wait()
-
-		if spaceErrorResetToken == myToken then
-			spaceErrorCount = 0
+	return function()
+		if activeWarningId and activeWarningId.id ~= id then
+			activeWarningId.reset()
 		end
-	end)
+		activeWarningId = { id = id, reset = resetCount }
+
+		count += 1
+		warningLabel.Text = textFormat:format(count)
+		warningLabel.TextTransparency = 0
+		warningStroke.Transparency = 0
+
+		-- Bumping this SHARED token invalidates any fade-out scheduled by either warning type --
+		-- when THIS delay elapses, it'll be the only one whose token still matches, so it's the
+		-- only one that actually fades. A different warning type firing in the meantime both
+		-- cuts off the display (by overwriting .Text above) AND silently cancels this fade.
+		warningResetToken += 1
+		local myToken = warningResetToken
+
+		task.delay(WARNING_HOLD_DURATION, function()
+			if warningResetToken ~= myToken then return end
+
+			local fadeInfo = TweenInfo.new(WARNING_FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			local fadeTween = TweenService:Create(warningLabel, fadeInfo, { TextTransparency = 1 })
+			TweenService:Create(warningStroke, fadeInfo, { Transparency = 1 }):Play()
+			fadeTween:Play()
+			fadeTween.Completed:Wait()
+
+			if warningResetToken == myToken then
+				count = 0
+				activeWarningId = nil
+			end
+		end)
+	end
 end
 
+local showSpaceError = createWarningTrigger("space", "Not Enough Space, Please Merge (x%d)")
+local showMoneyError = createWarningTrigger("money", "Not Enough Money (x%d)")
+
 Remotes.ShopSpaceError.OnClientEvent:Connect(showSpaceError)
+Remotes.MoneyError.OnClientEvent:Connect(showMoneyError)
 
 -- Ask the server for our actual loaded stats now that we're listening for the reply above --
 -- without this, everything just sits at these scripts' own built-in defaults (0, "$0", etc.)
