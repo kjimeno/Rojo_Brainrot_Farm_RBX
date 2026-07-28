@@ -158,7 +158,8 @@ GameConfig.MergeRequirement = 3
 GameConfig.BaseConversionRate = 1
 
 GameConfig.ConversionUpgrade = {
-	MaxLevel = 20,
+	-- No MaxLevel -- upgrades are purchasable indefinitely, the cost/rate formulas below already
+	-- generalize to any level with no cap baked in.
 	BaseCost = 1,
 	CostGrowth = 1.4,     -- each purchase costs 1.4x the previous one
 	RatePerLevel = 0.75,  -- how much the FIRST purchase adds to your rate
@@ -203,14 +204,13 @@ GameConfig.ConveyorTravelTime = 4
 -- ============ NUMBER FORMATTING ============
 -- Shared by both client (HUD text) and server (billboard/platform text) so every place a big
 -- lump-sum number gets shown -- cash, prices, energy amounts -- uses the same abbreviation
--- rule: plain comma-formatted below 100,000, then K/M/B/T above that. The decimal is dropped
--- entirely when it'd just be ".0" (100,000 -> "100K", not "100.0K"), but kept otherwise
--- (5,200,000 -> "5.2M").
+-- rule: plain comma-formatted below 100,000, then K/M/B/T above that -- 1 decimal place in the
+-- K range (100,000 -> "100.0K"), 2 decimal places from M upward (5,200,000 -> "5.20M").
 local ABBREVIATIONS = {
-	{ threshold = 1e12, divisor = 1e12, suffix = "T" },
-	{ threshold = 1e9, divisor = 1e9, suffix = "B" },
-	{ threshold = 1e6, divisor = 1e6, suffix = "M" },
-	{ threshold = 1e5, divisor = 1e3, suffix = "K" }, -- 100,000 is the cutoff, not 1,000
+	{ threshold = 1e12, divisor = 1e12, suffix = "T", decimals = 2 },
+	{ threshold = 1e9, divisor = 1e9, suffix = "B", decimals = 2 },
+	{ threshold = 1e6, divisor = 1e6, suffix = "M", decimals = 2 },
+	{ threshold = 1e5, divisor = 1e3, suffix = "K", decimals = 1 }, -- 100,000 is the cutoff, not 1,000
 }
 
 function GameConfig.FormatAbbreviatedNumber(amount: number): string
@@ -219,17 +219,25 @@ function GameConfig.FormatAbbreviatedNumber(amount: number): string
 
 	for _, entry in ipairs(ABBREVIATIONS) do
 		if magnitude >= entry.threshold then
-			local scaled = math.floor((magnitude / entry.divisor) * 10 + 0.5) / 10
-			local formatted = (scaled == math.floor(scaled))
-				and tostring(math.floor(scaled))
-				or ("%.1f"):format(scaled)
-			return (isNegative and "-" or "") .. formatted .. entry.suffix
+			local scaled = magnitude / entry.divisor
+			return (isNegative and "-" or "") .. ("%." .. entry.decimals .. "f"):format(scaled) .. entry.suffix
 		end
 	end
 
 	local digits = tostring(math.floor(magnitude))
 	local reversed = digits:reverse():gsub("(%d%d%d)", "%1,"):gsub(",$", "")
 	return (isNegative and "-" or "") .. reversed:reverse()
+end
+
+-- Same abbreviation above 100,000 as FormatAbbreviatedNumber (both always show 2 decimals
+-- there now), but for per-second RATES rather than lump sums -- rates are meaningfully
+-- fractional BELOW that threshold too (e.g. "1.75"), so this keeps 2 decimals down there as
+-- well instead of falling back to comma-formatted whole numbers.
+function GameConfig.FormatAbbreviatedRate(amount: number): string
+	if math.abs(amount) >= 1e5 then
+		return GameConfig.FormatAbbreviatedNumber(amount)
+	end
+	return ("%.2f"):format(amount)
 end
 
 return GameConfig

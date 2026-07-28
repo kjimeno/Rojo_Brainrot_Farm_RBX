@@ -114,7 +114,7 @@ local function updateBoard(plot: Instance, data)
 
 	local boardRateLabel = surfaceGui:FindFirstChild("RateLabel", true)
 	if boardRateLabel then
-		boardRateLabel.Text = ("%.1f per Second"):format(rate)
+		boardRateLabel.Text = ("%s per Second"):format(GameConfig.FormatAbbreviatedRate(rate))
 	else
 		warn("[EnergyConversionSystem] ConversionBoard on " .. plot.Name .. " has no RateLabel")
 	end
@@ -132,21 +132,15 @@ local function updateBoard(plot: Instance, data)
 		local rateLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("RateLabel")
 		local costLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("CostLabel")
 
-		if data.ConversionLevel >= GameConfig.ConversionUpgrade.MaxLevel then
-			if rateLabel then rateLabel.Text = "MAX" end
-			if costLabel then costLabel.Text = "LEVEL" end
-			upgradePlatform.Color = Color3.new(1, 1, 1)
-		else
-			-- Both the rate increase AND the cost grow with each purchase (RateGrowth / CostGrowth
-			-- respectively), so both lines have to be recomputed from the player's current level
-			-- every time, not baked in once when the billboard was first created.
-			if rateLabel then
-				rateLabel.Text = ("+%.2f per second"):format(GameConfig.GetNextRateIncrease(data.ConversionLevel))
-			end
-			local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
-			if costLabel then costLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(cost)) end
-			upgradePlatform.Color = (data.Cash >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
+		-- No level cap -- both the rate increase AND the cost grow with each purchase (RateGrowth
+		-- / CostGrowth respectively), so both lines have to be recomputed from the player's
+		-- current level every time, not baked in once when the billboard was first created.
+		if rateLabel then
+			rateLabel.Text = ("+%s per second"):format(GameConfig.FormatAbbreviatedRate(GameConfig.GetNextRateIncrease(data.ConversionLevel)))
 		end
+		local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
+		if costLabel then costLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(cost)) end
+		upgradePlatform.Color = (data.Cash >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
 	end
 end
 
@@ -209,7 +203,7 @@ local function ensureUpgradeBillboard(platform: Instance)
 	rateLabel.Font = Enum.Font.GothamBold
 	rateLabel.TextScaled = true
 	rateLabel.TextColor3 = Color3.new(1, 1, 1)
-	rateLabel.Text = ("+%.2f per second"):format(GameConfig.ConversionUpgrade.RatePerLevel)
+	rateLabel.Text = ("+%s per second"):format(GameConfig.FormatAbbreviatedRate(GameConfig.ConversionUpgrade.RatePerLevel))
 	rateLabel.Parent = billboard
 
 	local costLabel = Instance.new("TextLabel")
@@ -220,7 +214,7 @@ local function ensureUpgradeBillboard(platform: Instance)
 	costLabel.Font = Enum.Font.GothamBold
 	costLabel.TextScaled = true
 	costLabel.TextColor3 = CASH_COLOR
-	costLabel.Text = ("$%d"):format(GameConfig.GetUpgradeCost(0))
+	costLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(GameConfig.GetUpgradeCost(0)))
 	costLabel.Parent = billboard
 end
 
@@ -228,10 +222,6 @@ end
 local function tryUpgradeConversion(player: Player): (boolean, number | string)
 	local data = PlayerDataManager.Get(player)
 	if not data then return false, "Data not loaded" end
-
-	if data.ConversionLevel >= GameConfig.ConversionUpgrade.MaxLevel then
-		return false, "Max level reached"
-	end
 
 	local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
 	if data.Cash < cost then

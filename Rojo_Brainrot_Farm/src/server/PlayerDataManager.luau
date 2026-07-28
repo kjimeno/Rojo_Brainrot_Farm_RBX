@@ -10,7 +10,7 @@ PlayerDataManager.Cache = {} -- [player] = dataTable
 local DataStore = DataStoreService:GetDataStore("BrainrotTycoon_v1")
 
 local DEFAULT_DATA = {
-	Cash = 3000,
+	Cash = 200000,
 	StoredEnergy = 0,
 	SiloEnergy = 0,
 	PendingCash = 0,
