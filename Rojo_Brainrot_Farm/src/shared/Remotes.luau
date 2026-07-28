@@ -14,6 +14,7 @@ local REMOTE_NAMES = {
 	"RequestStats",
 	"BrainrotHop",
 	"PlatformPress",
+	"ShopSpaceError",
 }
 
 local Remotes = {}

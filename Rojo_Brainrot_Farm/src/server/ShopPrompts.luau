@@ -86,7 +86,13 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 		print(("[Shop] %s bought %dx %s. Cash left: %d"):format(player.Name, quantity, brainrotName, data.Cash))
 	else
 		print(("[Shop] %s failed to buy %dx %s: %s"):format(player.Name, quantity, brainrotName, tostring(resultOrError)))
-		-- Once you build real UI, fire a dedicated remote here to show an error toast/sound.
+
+		-- Both of these mean "the purchase itself would be fine, but there's nowhere to put the
+		-- result" -- worth a HUD callout since RepeatingTouch means the player will otherwise
+		-- just keep silently failing every second while standing there wondering why.
+		if resultOrError == "No free slot on plot" or resultOrError == "Not enough room on plot" then
+			Remotes.ShopSpaceError:FireClient(player)
+		end
 	end
 end
 

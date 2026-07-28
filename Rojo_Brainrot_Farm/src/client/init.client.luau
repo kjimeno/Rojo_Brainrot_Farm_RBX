@@ -667,6 +667,78 @@ end
 
 Remotes.PlatformPress.OnClientEvent:Connect(playPlatformPress)
 
+-- ===== Shop space warning: "Not Enough Space, please merge (xN)" =====
+-- Parented INSIDE Icon (a sibling of the floating "+N" gain texts), not under HUD.Up directly --
+-- Up apparently lays its children out automatically (that's what was shifting the energy amount
+-- text left when this was added as a sibling of Icon instead), so adding new stuff has to go
+-- inside Icon's own free-form area instead of Up's managed one. Shows just below Icon's bottom
+-- edge, with a ZIndex above the gain texts' own so it still renders on top of them (Sibling
+-- ZIndexBehavior compares these as true siblings here, no "whole subtree" trick needed).
+-- Every failed buy due to no room bumps the count and resets a fresh SPACE_ERROR_HOLD_DURATION
+-- window before it starts fading -- RepeatingTouch means a player standing there gets one of
+-- these per second, so it should feel alive the whole time they're stuck, then fade out shortly
+-- after they actually stop failing.
+local SPACE_ERROR_HOLD_DURATION = 4 -- seconds of no new failures before it starts fading
+local SPACE_ERROR_FADE_DURATION = 0.5
+
+local energyIcon = Main.HUD.Up.Icon
+
+local spaceErrorLabel = Instance.new("TextLabel")
+spaceErrorLabel.Name = "SpaceErrorLabel"
+spaceErrorLabel.BackgroundTransparency = 1
+spaceErrorLabel.AnchorPoint = Vector2.new(0.5, 0)
+spaceErrorLabel.Position = UDim2.new(0.5, 0, 1, 18)
+spaceErrorLabel.Size = UDim2.new(10, 0, 1.5, 0) --UDim2.new(2.6, 0, 0, 40)
+spaceErrorLabel.Font = Enum.Font.FredokaOne
+spaceErrorLabel.TextScaled = true
+spaceErrorLabel.TextColor3 = Color3.new(1, 1, 1)
+spaceErrorLabel.TextTransparency = 1
+spaceErrorLabel.TextStrokeTransparency = 1 -- always fully off -- the UIStroke below is the only visible outline now, so this doesn't double up
+spaceErrorLabel.Text = ""
+spaceErrorLabel.ZIndex = energyIcon.main.ZIndex + 10
+spaceErrorLabel.Parent = energyIcon
+
+-- A UIStroke gives an adjustable Thickness, unlike the built-in TextStrokeTransparency outline
+-- (fixed thickness, transparency-only) -- this is what actually makes the outline thicker.
+local spaceErrorStroke = Instance.new("UIStroke")
+spaceErrorStroke.Name = "SpaceErrorStroke"
+spaceErrorStroke.Color = Color3.new(0.1059, 0.1647, 0.2078)
+spaceErrorStroke.Thickness = 2
+spaceErrorStroke.Transparency = 0.1
+spaceErrorStroke.Parent = spaceErrorLabel
+
+local spaceErrorCount = 0
+local spaceErrorResetToken = 0
+
+local function showSpaceError()
+	spaceErrorCount += 1
+	spaceErrorLabel.Text = ("Not Enough Space, Please Merge (x%d)"):format(spaceErrorCount)
+	spaceErrorLabel.TextTransparency = 0
+	spaceErrorStroke.Transparency = 0
+
+	-- Bumping this token invalidates any fade-out already scheduled from an earlier failure --
+	-- when THIS delay elapses, it'll be the only one whose token still matches, so it's the only
+	-- one that actually fades. Every new failure effectively restarts the 3-second countdown.
+	spaceErrorResetToken += 1
+	local myToken = spaceErrorResetToken
+
+	task.delay(SPACE_ERROR_HOLD_DURATION, function()
+		if spaceErrorResetToken ~= myToken then return end
+
+		local fadeInfo = TweenInfo.new(SPACE_ERROR_FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local fadeTween = TweenService:Create(spaceErrorLabel, fadeInfo, { TextTransparency = 1 })
+		TweenService:Create(spaceErrorStroke, fadeInfo, { Transparency = 1 }):Play()
+		fadeTween:Play()
+		fadeTween.Completed:Wait()
+
+		if spaceErrorResetToken == myToken then
+			spaceErrorCount = 0
+		end
+	end)
+end
+
+Remotes.ShopSpaceError.OnClientEvent:Connect(showSpaceError)
+
 -- Ask the server for our actual loaded stats now that we're listening for the reply above --
 -- without this, everything just sits at these scripts' own built-in defaults (0, "$0", etc.)
 -- until some other action (buying, depositing, ...) happens to push an update.
