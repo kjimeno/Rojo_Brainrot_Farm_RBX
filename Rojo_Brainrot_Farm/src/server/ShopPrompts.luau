@@ -54,7 +54,7 @@ local function ensureShopBillboard(platform: BasePart, brainrotName: string, qua
 	priceLabel.Font = Enum.Font.GothamBold
 	priceLabel.TextScaled = true
 	priceLabel.TextColor3 = Color3.fromRGB(60, 200, 100)
-	priceLabel.Text = ("%d cash"):format(config.Price * quantity)
+	priceLabel.Text = ("%s cash"):format(GameConfig.FormatAbbreviatedNumber(config.Price * quantity))
 	priceLabel.Parent = billboard
 end
 

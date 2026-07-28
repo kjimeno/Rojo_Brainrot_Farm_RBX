@@ -24,7 +24,7 @@ GameConfig.Brainrots = {
 	["Tim Cheese"] = {
 		Tier = 2,
 		Price = 25,
-		EnergyPerDrop = 3,
+		EnergyPerDrop = 5,
 		DropInterval = 5,
 		MergeInto = "Trippi Troppi",
 		FacingOffset = 180,
@@ -32,7 +32,7 @@ GameConfig.Brainrots = {
 	["Trippi Troppi"] = {
 		Tier = 3,
 		Price = 125,
-		EnergyPerDrop = 8,
+		EnergyPerDrop = 25,
 		DropInterval = 5,
 		MergeInto = "Trippi Troppi Troppa Trippa",
 		FacingOffset = 180,
@@ -40,7 +40,7 @@ GameConfig.Brainrots = {
 	["Trippi Troppi Troppa Trippa"] = {
 		Tier = 4,
 		Price = 625,
-		EnergyPerDrop = 20,
+		EnergyPerDrop = 90,
 		DropInterval = 5,
 		MergeInto = "Cappuccino Assassino",
 		FacingOffset = 180,
@@ -48,7 +48,7 @@ GameConfig.Brainrots = {
 	["Cappuccino Assassino"] = {
 		Tier = 5,
 		Price = 3125,
-		EnergyPerDrop = 50,
+		EnergyPerDrop = 300,
 		DropInterval = 5,
 		MergeInto = "Chimpanzini Bananini",
 		FacingOffset = 180,
@@ -56,7 +56,7 @@ GameConfig.Brainrots = {
 	["Chimpanzini Bananini"] = {
 		Tier = 6,
 		Price = 15625,
-		EnergyPerDrop = 125,
+		EnergyPerDrop = 1100,
 		DropInterval = 5,
 		MergeInto = "Bombardiro Crocodilo",
 		FacingOffset = 180,
@@ -64,7 +64,7 @@ GameConfig.Brainrots = {
 	["Bombardiro Crocodilo"] = {
 		Tier = 7,
 		Price = 78125,
-		EnergyPerDrop = 310,
+		EnergyPerDrop = 4000,
 		DropInterval = 5,
 		MergeInto = "Chimpanzini Spiderini",
 		FacingOffset = 180,
@@ -72,7 +72,7 @@ GameConfig.Brainrots = {
 	["Chimpanzini Spiderini"] = {
 		Tier = 8,
 		Price = 390625,
-		EnergyPerDrop = 780,
+		EnergyPerDrop = 15000,
 		DropInterval = 5,
 		MergeInto = "Tralalero Tralala",
 		FacingOffset = 180,
@@ -80,7 +80,7 @@ GameConfig.Brainrots = {
 	["Tralalero Tralala"] = {
 		Tier = 9,
 		Price = 1953125,
-		EnergyPerDrop = 1950,
+		EnergyPerDrop = 60000,
 		DropInterval = 5,
 		MergeInto = "Tung Tung Tung Sahur",
 		FacingOffset = 180,
@@ -88,7 +88,7 @@ GameConfig.Brainrots = {
 	["Tung Tung Tung Sahur"] = {
 		Tier = 10,
 		Price = 9765625,
-		EnergyPerDrop = 4900,
+		EnergyPerDrop = 235000,
 		DropInterval = 5,
 		MergeInto = "67",
 		FacingOffset = 180,
@@ -96,7 +96,7 @@ GameConfig.Brainrots = {
 	["67"] = {
 		Tier = 11,
 		Price = 48828125,
-		EnergyPerDrop = 12250,
+		EnergyPerDrop = 900000,
 		DropInterval = 5,
 		MergeInto = "Dragon Cannelloni",
 		FacingOffset = 180,
@@ -104,7 +104,7 @@ GameConfig.Brainrots = {
 	["Dragon Cannelloni"] = {
 		Tier = 12,
 		Price = 244140625,
-		EnergyPerDrop = 30600,
+		EnergyPerDrop = 4000000,
 		DropInterval = 5,
 		MergeInto = "Garama and Madundung",
 		FacingOffset = 180,
@@ -112,7 +112,7 @@ GameConfig.Brainrots = {
 	["Garama and Madundung"] = {
 		Tier = 13,
 		Price = 1220703125,
-		EnergyPerDrop = 76500,
+		EnergyPerDrop = 15000000,
 		DropInterval = 5,
 		MergeInto = "Strawberry Elephant",
 		FacingOffset = 180,
@@ -120,7 +120,7 @@ GameConfig.Brainrots = {
 	["Strawberry Elephant"] = {
 		Tier = 14,
 		Price = 6103515625,
-		EnergyPerDrop = 191000,
+		EnergyPerDrop = 55000000,
 		DropInterval = 5,
 		MergeInto = "La Grande Combinasion",
 		FacingOffset = 180,
@@ -128,7 +128,7 @@ GameConfig.Brainrots = {
 	["La Grande Combinasion"] = {
 		Tier = 15,
 		Price = 30517578125,
-		EnergyPerDrop = 478000,
+		EnergyPerDrop = 225000000,
 		DropInterval = 5,
 		MergeInto = nil, -- max tier for now
 		FacingOffset = 180,
@@ -199,5 +199,37 @@ GameConfig.MaxBrainrotsPerPlot = 50
 GameConfig.StackLayerHeight = 10
 
 GameConfig.ConveyorTravelTime = 4
+
+-- ============ NUMBER FORMATTING ============
+-- Shared by both client (HUD text) and server (billboard/platform text) so every place a big
+-- lump-sum number gets shown -- cash, prices, energy amounts -- uses the same abbreviation
+-- rule: plain comma-formatted below 100,000, then K/M/B/T above that. The decimal is dropped
+-- entirely when it'd just be ".0" (100,000 -> "100K", not "100.0K"), but kept otherwise
+-- (5,200,000 -> "5.2M").
+local ABBREVIATIONS = {
+	{ threshold = 1e12, divisor = 1e12, suffix = "T" },
+	{ threshold = 1e9, divisor = 1e9, suffix = "B" },
+	{ threshold = 1e6, divisor = 1e6, suffix = "M" },
+	{ threshold = 1e5, divisor = 1e3, suffix = "K" }, -- 100,000 is the cutoff, not 1,000
+}
+
+function GameConfig.FormatAbbreviatedNumber(amount: number): string
+	local isNegative = amount < 0
+	local magnitude = math.abs(amount)
+
+	for _, entry in ipairs(ABBREVIATIONS) do
+		if magnitude >= entry.threshold then
+			local scaled = math.floor((magnitude / entry.divisor) * 10 + 0.5) / 10
+			local formatted = (scaled == math.floor(scaled))
+				and tostring(math.floor(scaled))
+				or ("%.1f"):format(scaled)
+			return (isNegative and "-" or "") .. formatted .. entry.suffix
+		end
+	end
+
+	local digits = tostring(math.floor(magnitude))
+	local reversed = digits:reverse():gsub("(%d%d%d)", "%1,"):gsub(",$", "")
+	return (isNegative and "-" or "") .. reversed:reverse()
+end
 
 return GameConfig

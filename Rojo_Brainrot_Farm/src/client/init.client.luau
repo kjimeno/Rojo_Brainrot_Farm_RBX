@@ -64,11 +64,11 @@ workspace.DescendantAdded:Connect(trackShopPlatform)
 -- frame holding "Add"/"Subtract" badge templates. Reacts to our own Remotes.StatsUpdate
 -- instead of the kit's original Player.leaderstats.*.Changed, since this game doesn't use
 -- leaderstats. The tween/tick sound/floating +/- badge animation is unchanged from the kit.
+-- Comma-formatted below 100,000, K/M/B/T-abbreviated above that -- see
+-- GameConfig.FormatAbbreviatedNumber for the shared rule (also used server-side for
+-- platform/billboard text, so both stay consistent).
 local function formatNumber(amount: number): string
-	local isNegative = amount < 0
-	local digits = tostring(math.floor(math.abs(amount)))
-	local reversed = digits:reverse():gsub("(%d%d%d)", "%1,"):gsub(",$", "")
-	return (isNegative and "-" or "") .. reversed:reverse()
+	return GameConfig.FormatAbbreviatedNumber(amount)
 end
 
 -- `icon` is the ImageLabel itself (e.g. Main.HUD.Left.Icon); `statKey` is the field name to

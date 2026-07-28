@@ -107,7 +107,7 @@ local function updateBoard(plot: Instance, data)
 
 	local boardEnergyLabel = surfaceGui:FindFirstChild("EnergyLabel", true)
 	if boardEnergyLabel then
-		boardEnergyLabel.Text = tostring(data.SiloEnergy)
+		boardEnergyLabel.Text = GameConfig.FormatAbbreviatedNumber(data.SiloEnergy)
 	else
 		warn("[EnergyConversionSystem] ConversionBoard on " .. plot.Name .. " has no EnergyLabel")
 	end
@@ -123,7 +123,7 @@ local function updateBoard(plot: Instance, data)
 	local cashBillboard = vault and vault:FindFirstChild("CashVaultBillboard")
 	local amountLabel = cashBillboard and cashBillboard:FindFirstChild("AmountLabel")
 	if amountLabel then
-		amountLabel.Text = ("$%d"):format(data.PendingCash)
+		amountLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(data.PendingCash))
 	end
 
 	local upgradePlatform = plot:FindFirstChild("UpgradePlatform")
@@ -144,7 +144,7 @@ local function updateBoard(plot: Instance, data)
 				rateLabel.Text = ("+%.2f per second"):format(GameConfig.GetNextRateIncrease(data.ConversionLevel))
 			end
 			local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
-			if costLabel then costLabel.Text = ("$%d"):format(cost) end
+			if costLabel then costLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(cost)) end
 			upgradePlatform.Color = (data.Cash >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
 		end
 	end
