@@ -190,6 +190,19 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 		badge.main.Text = formatted
 		badge.shadow.Text = formatted
 
+		-- The template's main/shadow labels were built for a growing left-to-right list item,
+		-- so their own Position/AnchorPoint likely put them off to one side of the badge rather
+		-- than centered in it. Re-centering just their ANCHOR/POSITION (not their Size, which is
+		-- what TextScaled uses to compute font size -- changing it would also change how big the
+		-- text renders, which is the "grows with digit count" look) keeps the exact same
+		-- size/growth behavior as before, just recentered.
+		for _, label in ipairs({ badge.main, badge.shadow }) do
+			label.AnchorPoint = Vector2.new(0.5, 0.5)
+			label.Position = UDim2.new(0.5, 0, 0.5, 0)
+			label.TextXAlignment = Enum.TextXAlignment.Center
+			label.TextYAlignment = Enum.TextYAlignment.Center
+		end
+
 		-- Bigger gains get a bigger badge -- digits (log10-based) rather than the raw amount, so
 		-- it scales smoothly across the full 1 to hundreds-of-millions range instead of maxing
 		-- out almost immediately (or barely growing at all) with a linear formula.
