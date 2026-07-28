@@ -13,6 +13,7 @@ local REMOTE_NAMES = {
 	"StatsUpdate",
 	"RequestStats",
 	"BrainrotHop",
+	"PlatformPress",
 }
 
 local Remotes = {}

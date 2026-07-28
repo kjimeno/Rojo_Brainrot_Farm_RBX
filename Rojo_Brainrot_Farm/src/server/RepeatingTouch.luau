@@ -5,6 +5,9 @@
 -- merge platform) instead of each one reimplementing its own debounce/repeat loop.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local REPEAT_DEBOUNCE = 1.0 -- seconds between every repeat, for as long as they keep standing there
 
@@ -43,6 +46,10 @@ local function setupRepeatingTouch(platform: BasePart, action: (Player) -> ())
 		task.spawn(function()
 			while (touchCounts[player] or 0) > 0 do
 				action(player)
+				-- One broadcast per actual action trigger (not a separate decorative loop), so
+				-- the platform's client-side "press" animation (see init.client.luau) always
+				-- reflects a real purchase/action tick rather than running on its own timer.
+				Remotes.PlatformPress:FireAllClients(platform)
 				task.wait(REPEAT_DEBOUNCE)
 			end
 			hasActiveLoop[player] = false

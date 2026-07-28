@@ -625,6 +625,48 @@ end
 
 Remotes.BrainrotHop.OnClientEvent:Connect(playBrainrotHop)
 
+-- ===== Platform press: a smooth down-then-up bounce every time a platform actually triggers =====
+-- Played entirely client-side for the same replication-throttling reason as the brainrot hop
+-- above. RepeatingTouch.luau fires this once per real action tick (buy, deposit, collect,
+-- merge, upgrade -- whichever platform), not on a separate decorative timer, so the bounce
+-- always reflects something actually happening rather than running out of sync with it.
+local PLATFORM_PRESS_DEPTH = 0.6 -- studs, how far down it presses
+local PLATFORM_PRESS_DURATION = 0.35 -- seconds for the whole down-then-up cycle -- no pause held at the bottom
+
+local platformOriginalCFrames = {} -- [platform] = its CFrame before any press animation ever touched it
+local platformPressGeneration = {} -- [platform] = incrementing token; a newer press bails an older one out instead of fighting it
+
+local function playPlatformPress(platform: Instance)
+	if not platform or not platform:IsA("BasePart") or not platform.Parent then return end
+
+	if not platformOriginalCFrames[platform] then
+		platformOriginalCFrames[platform] = platform.CFrame
+	end
+	local originalCFrame = platformOriginalCFrames[platform]
+
+	platformPressGeneration[platform] = (platformPressGeneration[platform] or 0) + 1
+	local myGeneration = platformPressGeneration[platform]
+
+	task.spawn(function()
+		local startTime = os.clock()
+		while platform.Parent and platformPressGeneration[platform] == myGeneration do
+			local alpha = math.clamp((os.clock() - startTime) / PLATFORM_PRESS_DURATION, 0, 1)
+			-- sin(alpha*pi) sweeps 0 -> 1 -> 0 smoothly across the full duration -- down and
+			-- immediately back up in one continuous motion, no hold at the bottom.
+			local depthOffset = math.sin(alpha * math.pi) * PLATFORM_PRESS_DEPTH
+			platform.CFrame = originalCFrame - Vector3.new(0, depthOffset, 0)
+
+			if alpha >= 1 then break end
+			RunService.Heartbeat:Wait()
+		end
+		if platform.Parent and platformPressGeneration[platform] == myGeneration then
+			platform.CFrame = originalCFrame
+		end
+	end)
+end
+
+Remotes.PlatformPress.OnClientEvent:Connect(playPlatformPress)
+
 -- Ask the server for our actual loaded stats now that we're listening for the reply above --
 -- without this, everything just sits at these scripts' own built-in defaults (0, "$0", etc.)
 -- until some other action (buying, depositing, ...) happens to push an update.
