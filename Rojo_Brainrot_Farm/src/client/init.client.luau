@@ -71,10 +71,23 @@ local function formatNumber(amount: number): string
 	return GameConfig.FormatAbbreviatedNumber(amount)
 end
 
+local ENERGY_GAIN_TEXT_MAX_ANGLE = 30 -- degrees off straight-down -- keeps it from ever drifting too horizontal
+local ENERGY_GAIN_TEXT_DISTANCE_MIN = 56 -- pixels
+local ENERGY_GAIN_TEXT_DISTANCE_MAX = 104 -- pixels
+local ENERGY_GAIN_TEXT_FADE_DURATION = 1.4 -- fade lasts longer now
+local ENERGY_GAIN_TEXT_MOVE_DURATION = 1.5 -- slightly outlasts the fade so it never visibly stops short
+local ENERGY_GAIN_TEXT_MIN_SCALE = 0.45 -- badge scale for a small gain (relative to the cloned AddTemplate's own size)
+local ENERGY_GAIN_TEXT_MAX_SCALE = 0.9 -- badge scale cap for a huge gain, so it can't grow unboundedly large
+local ENERGY_GAIN_TEXT_SCALE_PER_DIGIT = 0.13 -- how much scale grows per extra digit in the amount (log-based, so it stays smooth across 1 up into the hundreds of millions)
+local ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y = 10 -- pixels down from icon-center where it first appears; the random drift then continues from there
+local ENERGY_GAIN_TEXT_SPEED_JITTER = 0.25 -- +/- this fraction of ENERGY_GAIN_TEXT_MOVE_DURATION, randomized per popup, so they don't all move at identical speed
+
 -- `icon` is the ImageLabel itself (e.g. Main.HUD.Left.Icon); `statKey` is the field name to
 -- watch for in Remotes.StatsUpdate payloads (e.g. "Cash", "StoredEnergy"); `showBadgeOnDecrease`
--- controls whether decreases get the floating badge callout too (Cash: yes, Energy: no).
-local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBadgeOnDecrease: boolean)
+-- controls whether decreases get the floating badge callout too (Cash: yes, Energy: no);
+-- `gainStyle` picks which visual a gain uses -- "list" is Cash's stacked Transactions badge,
+-- "floating" is Energy's random-downward fading "+N" text.
+local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBadgeOnDecrease: boolean, gainStyle: string)
 	-- Icon's Size is scale-based, so its absolute pixel box changes shape as the window/viewport
 	-- ratio changes -- ScaleType.Fit keeps the image itself at its own real proportions inside
 	-- that box (letterboxing as needed) instead of stretching to fill whatever shape the box
@@ -163,6 +176,74 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 		badge:Destroy()
 	end
 
+	-- Energy's gain callout: clones the SAME AddTemplate as the list badge above (so it keeps
+	-- the kit's original font/styling) but skips the open/close size animation entirely --
+	-- instead it drifts off in a random direction biased downward (never more than
+	-- ENERGY_GAIN_TEXT_MAX_ANGLE off straight-down) while fading out quickly, more like a
+	-- floating combat-text number than a queued notification.
+	local function playEnergyGainText(amount: number)
+		local badge = AddTemplate:Clone()
+		badge.Visible = true
+		badge.Parent = icon
+
+		local formatted = "+" .. formatNumber(amount)
+		badge.main.Text = formatted
+		badge.shadow.Text = formatted
+
+		-- Bigger gains get a bigger badge -- digits (log10-based) rather than the raw amount, so
+		-- it scales smoothly across the full 1 to hundreds-of-millions range instead of maxing
+		-- out almost immediately (or barely growing at all) with a linear formula.
+		local digits = math.floor(math.log(math.max(amount, 1), 10)) + 1
+		local scale = math.clamp(
+			ENERGY_GAIN_TEXT_MIN_SCALE + (digits - 1) * ENERGY_GAIN_TEXT_SCALE_PER_DIGIT,
+			ENERGY_GAIN_TEXT_MIN_SCALE,
+			ENERGY_GAIN_TEXT_MAX_SCALE
+		)
+
+		local originalSize = badge.Size
+		badge.Size = UDim2.new(
+			originalSize.X.Scale * scale, originalSize.X.Offset * scale,
+			originalSize.Y.Scale * scale, originalSize.Y.Offset * scale
+		)
+
+		badge.AnchorPoint = Vector2.new(0.5, 0.5)
+		badge.Position = UDim2.new(0.5, 0, 0.5, ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y)
+
+		local angle = math.rad((math.random() * 2 - 1) * ENERGY_GAIN_TEXT_MAX_ANGLE)
+		local distance = ENERGY_GAIN_TEXT_DISTANCE_MIN + math.random() * (ENERGY_GAIN_TEXT_DISTANCE_MAX - ENERGY_GAIN_TEXT_DISTANCE_MIN)
+		local offsetX = math.sin(angle) * distance
+		-- Drift continues from the (already-offset) spawn point, so the random downward travel
+		-- stacks on top of ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y rather than starting over from center.
+		local offsetY = ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y + math.cos(angle) * distance -- angle measured from straight down, so this is always positive (downward)
+
+		local speedJitter = 1 + (math.random() * 2 - 1) * ENERGY_GAIN_TEXT_SPEED_JITTER
+		TweenService:Create(
+			badge,
+			TweenInfo.new(ENERGY_GAIN_TEXT_MOVE_DURATION * speedJitter, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ Position = UDim2.new(0.5, offsetX, 0.5, offsetY) }
+		):Play()
+
+		local fadeInfo = TweenInfo.new(ENERGY_GAIN_TEXT_FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local mainFade = TweenService:Create(badge.main, fadeInfo, { TextTransparency = 1, TextStrokeTransparency = 1 })
+		local shadowFade = TweenService:Create(badge.shadow, fadeInfo, { TextTransparency = 1, TextStrokeTransparency = 1 })
+		mainFade:Play()
+		shadowFade:Play()
+
+		-- The visible "stroke" is very likely a UIStroke object (its own separate .Transparency
+		-- property, NOT TextStrokeTransparency), which the tweens above never touch -- that's
+		-- why the fill fades smoothly but the outline just sits there opaque until badge:Destroy()
+		-- yanks it away all at once. Fade every UIStroke found anywhere under the badge too.
+		for _, descendant in ipairs(badge:GetDescendants()) do
+			if descendant:IsA("UIStroke") then
+				TweenService:Create(descendant, fadeInfo, { Transparency = 1 }):Play()
+			end
+		end
+
+		mainFade.Completed:Wait()
+
+		badge:Destroy()
+	end
+
 	Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 		local newValue = stats[statKey]
 		if newValue == nil then return end
@@ -182,7 +263,13 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 		-- The number itself always tweens smoothly either direction; the floating badge
 		-- callout only shows for gains, unless showBadgeOnDecrease says decreases get one too.
 		if diff > 0 or showBadgeOnDecrease then
-			task.spawn(showTransactionBadge, diff)
+			if gainStyle == "floating" then
+				if diff > 0 then
+					task.spawn(playEnergyGainText, diff)
+				end
+			else
+				task.spawn(showTransactionBadge, diff)
+			end
 		end
 		tweenValue(prevValue, newValue, 0.5)
 
@@ -191,8 +278,8 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 end
 
 local Main = PlayerGui:WaitForChild("Main")
-createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true)
-createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy", false)
+createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true, "list")
+createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy", false, "floating")
 
 -- ===== Cash collect burst: icons burst out of the CoinVault in the air, then fly straight to you =====
 local CASH_BURST_MIN_COUNT = 5
