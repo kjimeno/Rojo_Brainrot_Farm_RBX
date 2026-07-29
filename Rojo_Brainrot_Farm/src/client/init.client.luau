@@ -566,48 +566,56 @@ end
 
 homeButton.MouseButton1Down:Connect(teleportHome)
 
--- Hover/press "juice" for the Home button: grows slightly (fast) on hover, shrinks briefly on
--- press, then settles back to whichever size is currently correct -- hover size if the cursor's
--- still over it, original size otherwise. Leaving the button always wins and forces it back to
--- original size immediately, even if a press animation is still mid-flight.
-local HOME_BUTTON_HOVER_SCALE = 1.12
-local HOME_BUTTON_PRESS_SCALE = 0.92
-local HOME_BUTTON_HOVER_DURATION = 0.12 -- fast
-local HOME_BUTTON_PRESS_DURATION = 0.15
+-- ===== Shared hover/press "juice" for HUD buttons =====
+-- Grows slightly (fast) on hover, shrinks briefly on press, then settles back to whichever size
+-- is currently correct -- hover size if the cursor's still over it, original size otherwise.
+-- Leaving the button always wins and forces it back to original size immediately, even if a
+-- press animation is still mid-flight.
+local BUTTON_HOVER_SCALE = 1.12
+local BUTTON_PRESS_SCALE = 0.92
+local BUTTON_HOVER_DURATION = 0.12 -- fast
+local BUTTON_PRESS_DURATION = 0.15
 
-local homeButtonOriginalSize = homeButton.Size
-local homeButtonHovering = false
+local function setupButtonPressJuice(button: GuiButton)
+	local originalSize = button.Size
+	local hovering = false
 
-local function tweenHomeButtonScale(scale: number, duration: number)
-	local target = UDim2.new(
-		homeButtonOriginalSize.X.Scale * scale, homeButtonOriginalSize.X.Offset * scale,
-		homeButtonOriginalSize.Y.Scale * scale, homeButtonOriginalSize.Y.Offset * scale
-	)
-	return TweenService:Create(homeButton, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = target })
+	local function tweenScale(scale: number, duration: number)
+		local target = UDim2.new(
+			originalSize.X.Scale * scale, originalSize.X.Offset * scale,
+			originalSize.Y.Scale * scale, originalSize.Y.Offset * scale
+		)
+		return TweenService:Create(button, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = target })
+	end
+
+	button.MouseEnter:Connect(function()
+		hovering = true
+		tweenScale(BUTTON_HOVER_SCALE, BUTTON_HOVER_DURATION):Play()
+	end)
+
+	button.MouseLeave:Connect(function()
+		hovering = false
+		tweenScale(1, BUTTON_HOVER_DURATION):Play()
+	end)
+
+	-- A quick click fires MouseButton1Down then MouseButton1Up almost immediately -- driving the
+	-- shrink from Down and the grow-back from Up meant the grow-back tween interrupted the
+	-- shrink before it ever finished. Instead, MouseButton1Down alone runs the whole press
+	-- sequence: shrink fully to BUTTON_PRESS_SCALE, WAIT for that to actually complete, then grow
+	-- back. MouseLeave (above) still overrides at any point, since it just starts a newer tween
+	-- on the same Size property, which cancels whatever this sequence is currently doing.
+	button.MouseButton1Down:Connect(function()
+		local shrinkTween = tweenScale(BUTTON_PRESS_SCALE, BUTTON_PRESS_DURATION)
+		shrinkTween:Play()
+		shrinkTween.Completed:Wait()
+		tweenScale(hovering and BUTTON_HOVER_SCALE or 1, BUTTON_PRESS_DURATION):Play()
+	end)
 end
 
-homeButton.MouseEnter:Connect(function()
-	homeButtonHovering = true
-	tweenHomeButtonScale(HOME_BUTTON_HOVER_SCALE, HOME_BUTTON_HOVER_DURATION):Play()
-end)
-
-homeButton.MouseLeave:Connect(function()
-	homeButtonHovering = false
-	tweenHomeButtonScale(1, HOME_BUTTON_HOVER_DURATION):Play()
-end)
-
--- A quick click fires MouseButton1Down then MouseButton1Up almost immediately -- driving the
--- shrink from Down and the grow-back from Up meant the grow-back tween interrupted the shrink
--- before it ever finished. Instead, MouseButton1Down alone runs the whole press sequence:
--- shrink fully to HOME_BUTTON_PRESS_SCALE, WAIT for that to actually complete, then grow back.
--- MouseLeave (above) still overrides at any point, since it just starts a newer tween on the
--- same Size property, which cancels whatever this sequence is currently doing.
-homeButton.MouseButton1Down:Connect(function()
-	local shrinkTween = tweenHomeButtonScale(HOME_BUTTON_PRESS_SCALE, HOME_BUTTON_PRESS_DURATION)
-	shrinkTween:Play()
-	shrinkTween.Completed:Wait()
-	tweenHomeButtonScale(homeButtonHovering and HOME_BUTTON_HOVER_SCALE or 1, HOME_BUTTON_PRESS_DURATION):Play()
-end)
+setupButtonPressJuice(homeButton)
+setupButtonPressJuice(Main.HUD.Left.Codes)
+setupButtonPressJuice(Main.HUD.Left.Shop)
+setupButtonPressJuice(Main.HUD.Left.Wheel)
 
 -- ===== Brainrot spawn hop: a little cosmetic bounce played whenever a brainrot spawns energy =====
 -- Played entirely client-side. The server used to animate this itself, but Roblox throttles
