@@ -548,7 +548,9 @@ local homeButton = Main.HUD.Bottom.HomeButton
 -- Looks for a part named "SpawnLocation" anywhere under the player's own plot (found the same
 -- way getMyPlot() finds it elsewhere in this script -- via the OwnerUserId attribute) and
 -- teleports the character there, a little above the pad so they don't clip into it.
-homeButton.Activated:Connect(function()
+-- MouseButton1Down (fires on press) rather than Activated (fires on release), so the teleport
+-- happens the instant the button is pressed, not when the mouse comes back up.
+local function teleportHome()
 	local plot = getMyPlot()
 	if not plot then return end
 
@@ -560,6 +562,51 @@ homeButton.Activated:Connect(function()
 	if not root then return end
 
 	root.CFrame = spawnLocation.CFrame + Vector3.new(0, 5, 0)
+end
+
+homeButton.MouseButton1Down:Connect(teleportHome)
+
+-- Hover/press "juice" for the Home button: grows slightly (fast) on hover, shrinks briefly on
+-- press, then settles back to whichever size is currently correct -- hover size if the cursor's
+-- still over it, original size otherwise. Leaving the button always wins and forces it back to
+-- original size immediately, even if a press animation is still mid-flight.
+local HOME_BUTTON_HOVER_SCALE = 1.12
+local HOME_BUTTON_PRESS_SCALE = 0.92
+local HOME_BUTTON_HOVER_DURATION = 0.12 -- fast
+local HOME_BUTTON_PRESS_DURATION = 0.15
+
+local homeButtonOriginalSize = homeButton.Size
+local homeButtonHovering = false
+
+local function tweenHomeButtonScale(scale: number, duration: number)
+	local target = UDim2.new(
+		homeButtonOriginalSize.X.Scale * scale, homeButtonOriginalSize.X.Offset * scale,
+		homeButtonOriginalSize.Y.Scale * scale, homeButtonOriginalSize.Y.Offset * scale
+	)
+	return TweenService:Create(homeButton, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = target })
+end
+
+homeButton.MouseEnter:Connect(function()
+	homeButtonHovering = true
+	tweenHomeButtonScale(HOME_BUTTON_HOVER_SCALE, HOME_BUTTON_HOVER_DURATION):Play()
+end)
+
+homeButton.MouseLeave:Connect(function()
+	homeButtonHovering = false
+	tweenHomeButtonScale(1, HOME_BUTTON_HOVER_DURATION):Play()
+end)
+
+-- A quick click fires MouseButton1Down then MouseButton1Up almost immediately -- driving the
+-- shrink from Down and the grow-back from Up meant the grow-back tween interrupted the shrink
+-- before it ever finished. Instead, MouseButton1Down alone runs the whole press sequence:
+-- shrink fully to HOME_BUTTON_PRESS_SCALE, WAIT for that to actually complete, then grow back.
+-- MouseLeave (above) still overrides at any point, since it just starts a newer tween on the
+-- same Size property, which cancels whatever this sequence is currently doing.
+homeButton.MouseButton1Down:Connect(function()
+	local shrinkTween = tweenHomeButtonScale(HOME_BUTTON_PRESS_SCALE, HOME_BUTTON_PRESS_DURATION)
+	shrinkTween:Play()
+	shrinkTween.Completed:Wait()
+	tweenHomeButtonScale(homeButtonHovering and HOME_BUTTON_HOVER_SCALE or 1, HOME_BUTTON_PRESS_DURATION):Play()
 end)
 
 -- ===== Brainrot spawn hop: a little cosmetic bounce played whenever a brainrot spawns energy =====
