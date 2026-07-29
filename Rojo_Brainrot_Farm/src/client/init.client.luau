@@ -15,6 +15,34 @@ local PlayerGui = player:WaitForChild("PlayerGui")
 
 local cash = 0
 
+-- ===== Background music playlist: cycles through all 3 tracks, then loops back to track 1 =====
+local MUSIC_TRACK_IDS = {
+	"rbxassetid://1841647093",
+	"rbxassetid://1848354536",
+	"rbxassetid://5409360995",
+}
+
+local musicSound = Instance.new("Sound")
+musicSound.Name = "BackgroundMusic"
+musicSound.Volume = 0.5
+musicSound.Parent = SoundService
+
+local currentTrackIndex = 1
+
+local function playCurrentTrack()
+	musicSound.SoundId = MUSIC_TRACK_IDS[currentTrackIndex]
+	musicSound:Play()
+end
+
+-- Ended only fires for a track that actually finished naturally (not Looped, since each Sound
+-- is single-shot here) -- advance to the next track, wrapping back to 1 after the 3rd.
+musicSound.Ended:Connect(function()
+	currentTrackIndex = (currentTrackIndex % #MUSIC_TRACK_IDS) + 1
+	playCurrentTrack()
+end)
+
+playCurrentTrack()
+
 -- ===== Shop platform afford / can't-afford base color =====
 -- The shop platforms are shared by every player, so the server can't set one "correct"
 -- color for everyone -- each client colors the platform Part itself against its OWN cash
