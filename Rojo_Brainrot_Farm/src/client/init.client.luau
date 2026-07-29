@@ -642,17 +642,75 @@ setupButtonPressJuice(Main.HUD.Left.Wheel)
 setupButtonPressJuice(Main.HUD.Right.Settings)
 
 -- ===== Settings panel: toggled open/closed by the Settings button =====
-local settingsPanel = Main.Panels.SettingsPanel
+-- Opening slides the panel up fast from a starting point below its resting position (but still
+-- above the bottom of the screen) into place, instead of just popping into existence. The
+-- Settings button itself slides to the right at the same time, then hides once that finishes
+-- (so it's out of the way entirely while the panel's open) -- reappearing and sliding back only
+-- when the panel's Close button brings it back.
+local SETTINGS_PANEL_OPEN_OFFSET_Y = 120 -- pixels below resting position it starts at
+local SETTINGS_PANEL_OPEN_DURATION = 0.18 -- fast
+local SETTINGS_BUTTON_OPEN_OFFSET_X = 60 -- pixels the Settings button slides right by while the panel's open
 
-Main.HUD.Right.Settings.MouseButton1Down:Connect(function()
-	settingsPanel.Visible = not settingsPanel.Visible
+local settingsPanel = Main.Panels.SettingsPanel
+local settingsPanelRestingPosition = settingsPanel.Position
+local settingsPanelStartPosition = settingsPanelRestingPosition + UDim2.new(0, 0, 0, SETTINGS_PANEL_OPEN_OFFSET_Y)
+
+local settingsButton = Main.HUD.Right.Settings
+local settingsButtonRestingPosition = settingsButton.Position
+local settingsButtonOpenPosition = settingsButtonRestingPosition + UDim2.new(0, SETTINGS_BUTTON_OPEN_OFFSET_X, 0, 0)
+
+local function openSettingsPanel()
+	settingsPanel.Position = settingsPanelStartPosition
+	settingsPanel.Visible = true
+	TweenService:Create(
+		settingsPanel,
+		TweenInfo.new(SETTINGS_PANEL_OPEN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Position = settingsPanelRestingPosition }
+	):Play()
+
+	local buttonSlideTween = TweenService:Create(
+		settingsButton,
+		TweenInfo.new(SETTINGS_PANEL_OPEN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Position = settingsButtonOpenPosition }
+	)
+	buttonSlideTween:Play()
+	buttonSlideTween.Completed:Wait()
+	settingsButton.Visible = false
+end
+
+-- Reverse of openSettingsPanel: brings the Settings button back first (so its slide-back is
+-- actually visible), slides both back to their starting spots, THEN hides the panel once it's
+-- actually there -- so it always ends each close back at the same spot the next open expects to
+-- start from.
+local function closeSettingsPanel()
+	settingsButton.Visible = true
+	TweenService:Create(
+		settingsButton,
+		TweenInfo.new(SETTINGS_PANEL_OPEN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		{ Position = settingsButtonRestingPosition }
+	):Play()
+
+	local closeTween = TweenService:Create(
+		settingsPanel,
+		TweenInfo.new(SETTINGS_PANEL_OPEN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		{ Position = settingsPanelStartPosition }
+	)
+	closeTween:Play()
+	closeTween.Completed:Wait()
+	settingsPanel.Visible = false
+end
+
+settingsButton.MouseButton1Down:Connect(function()
+	if settingsPanel.Visible then
+		closeSettingsPanel()
+	else
+		openSettingsPanel()
+	end
 end)
 
 local settingsCloseButton = settingsPanel.Top.Close
 setupButtonPressJuice(settingsCloseButton)
-settingsCloseButton.MouseButton1Down:Connect(function()
-	settingsPanel.Visible = false
-end)
+settingsCloseButton.MouseButton1Down:Connect(closeSettingsPanel)
 
 -- ===== Volume sliders (music + sfx) =====
 -- Each Bar.Dragger has its own UIDragDetector already configured in Studio (constrained to
