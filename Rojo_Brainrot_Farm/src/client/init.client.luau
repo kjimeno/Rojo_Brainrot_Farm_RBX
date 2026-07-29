@@ -656,6 +656,20 @@ setupButtonPressJuice(homeButton)
 setupButtonPressJuice(Main.HUD.Left.Codes)
 setupButtonPressJuice(Main.HUD.Left.Shop)
 setupButtonPressJuice(Main.HUD.Left.Wheel)
+setupButtonPressJuice(Main.HUD.Right.Settings)
+
+-- ===== Settings panel: toggled open/closed by the Settings button =====
+local settingsPanel = Main.Panels.SettingsPanel
+
+Main.HUD.Right.Settings.MouseButton1Down:Connect(function()
+	settingsPanel.Visible = not settingsPanel.Visible
+end)
+
+local settingsCloseButton = settingsPanel.Top.Close
+setupButtonPressJuice(settingsCloseButton)
+settingsCloseButton.MouseButton1Down:Connect(function()
+	settingsPanel.Visible = false
+end)
 
 -- ===== Brainrot spawn hop: a little cosmetic bounce played whenever a brainrot spawns energy =====
 -- Played entirely client-side. The server used to animate this itself, but Roblox throttles
