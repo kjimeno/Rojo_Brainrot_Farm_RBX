@@ -671,6 +671,27 @@ settingsCloseButton.MouseButton1Down:Connect(function()
 	settingsPanel.Visible = false
 end)
 
+-- ===== Music volume slider =====
+-- Bar.Dragger has its own UIDragDetector already configured in Studio (constrained to slide
+-- between the two ends of Bar) -- this doesn't touch the drag itself, it just reacts to
+-- wherever the Dragger ends up. Using AbsolutePosition/AbsoluteSize (real on-screen pixels)
+-- rather than Position directly keeps this correct regardless of what units the drag detector
+-- happens to move it in (Scale vs Offset), since Absolute* is always resolved to real pixels.
+local musicBar = settingsPanel.Main.Holder.Music.Bar
+local musicDragger = musicBar.Dragger
+
+local function updateMusicVolumeFromDragger()
+	local draggableWidth = musicBar.AbsoluteSize.X - musicDragger.AbsoluteSize.X
+	local alpha = 0
+	if draggableWidth > 0 then
+		alpha = (musicDragger.AbsolutePosition.X - musicBar.AbsolutePosition.X) / draggableWidth
+	end
+	musicSound.Volume = math.clamp(alpha, 0, 1)
+end
+
+musicDragger:GetPropertyChangedSignal("AbsolutePosition"):Connect(updateMusicVolumeFromDragger)
+updateMusicVolumeFromDragger() -- sync starting volume to wherever the dragger currently sits
+
 -- ===== Brainrot spawn hop: a little cosmetic bounce played whenever a brainrot spawns energy =====
 -- Played entirely client-side. The server used to animate this itself, but Roblox throttles
 -- CFrame replication for Anchored parts much harder than physics-simulated ones, so a
