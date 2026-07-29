@@ -654,28 +654,42 @@ settingsCloseButton.MouseButton1Down:Connect(function()
 	settingsPanel.Visible = false
 end)
 
--- ===== Music volume slider =====
--- Bar.Dragger has its own UIDragDetector already configured in Studio (constrained to slide
--- between the two ends of Bar) -- this doesn't touch the drag itself, it just reacts to
+-- ===== Volume sliders (music + sfx) =====
+-- Each Bar.Dragger has its own UIDragDetector already configured in Studio (constrained to
+-- slide between the two ends of Bar) -- this doesn't touch the drag itself, it just reacts to
 -- wherever the Dragger ends up. Using AbsolutePosition/AbsoluteSize (real on-screen pixels)
 -- rather than Position directly keeps this correct regardless of what units the drag detector
 -- happens to move it in (Scale vs Offset), since Absolute* is always resolved to real pixels.
-local MUSIC_MAX_VOLUME = 1.0 -- what the slider's fully-right (100%) position actually plays at
-
-local musicBar = settingsPanel.Main.Holder.Music.Bar
-local musicDragger = musicBar.Dragger
-
-local function updateMusicVolumeFromDragger()
-	local draggableWidth = musicBar.AbsoluteSize.X - musicDragger.AbsoluteSize.X
-	local alpha = 0
-	if draggableWidth > 0 then
-		alpha = (musicDragger.AbsolutePosition.X - musicBar.AbsolutePosition.X) / draggableWidth
+--
+-- `maxVolume` is what the slider's fully-right (100%) position actually plays at; `onChanged`
+-- gets called with the resulting 0..maxVolume value every time the dragger moves (and once
+-- immediately, to sync to wherever it currently sits).
+local function setupVolumeSlider(bar: Instance, dragger: Instance, maxVolume: number, onChanged: (number) -> ())
+	local function update()
+		local draggableWidth = bar.AbsoluteSize.X - dragger.AbsoluteSize.X
+		local alpha = 0
+		if draggableWidth > 0 then
+			alpha = (dragger.AbsolutePosition.X - bar.AbsolutePosition.X) / draggableWidth
+		end
+		onChanged(math.clamp(alpha, 0, 1) * maxVolume)
 	end
-	musicSound.Volume = math.clamp(alpha, 0, 1) * MUSIC_MAX_VOLUME
+
+	dragger:GetPropertyChangedSignal("AbsolutePosition"):Connect(update)
+	update()
 end
 
-musicDragger:GetPropertyChangedSignal("AbsolutePosition"):Connect(updateMusicVolumeFromDragger)
-updateMusicVolumeFromDragger() -- sync starting volume to wherever the dragger currently sits
+local MUSIC_MAX_VOLUME = 1.0
+local musicBar = settingsPanel.Main.Holder.Music.Bar
+setupVolumeSlider(musicBar, musicBar.Dragger, MUSIC_MAX_VOLUME, function(volume)
+	musicSound.Volume = volume
+end)
+
+local SFX_MAX_VOLUME = 2 -- matches the boosted hover/click Volume set earlier
+local sfxBar = settingsPanel.Main.Holder.Sfx.Bar
+setupVolumeSlider(sfxBar, sfxBar.Dragger, SFX_MAX_VOLUME, function(volume)
+	buttonHoverSound.Volume = volume
+	buttonClickSound.Volume = volume
+end)
 
 -- ===== Brainrot spawn hop: a little cosmetic bounce played whenever a brainrot spawns energy =====
 -- Played entirely client-side. The server used to animate this itself, but Roblox throttles
