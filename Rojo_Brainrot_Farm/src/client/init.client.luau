@@ -15,33 +15,14 @@ local PlayerGui = player:WaitForChild("PlayerGui")
 
 local cash = 0
 
--- ===== Background music playlist: cycles through all 3 tracks, then loops back to track 1 =====
-local MUSIC_TRACK_IDS = {
-	"rbxassetid://1841647093",
-	"rbxassetid://1848354536",
-	"rbxassetid://5409360995",
-}
-
+-- ===== Background music: just track 1, looping =====
 local musicSound = Instance.new("Sound")
 musicSound.Name = "BackgroundMusic"
+musicSound.SoundId = "rbxassetid://1841647093"
 musicSound.Volume = 0.5
+musicSound.Looped = true
 musicSound.Parent = SoundService
-
-local currentTrackIndex = 1
-
-local function playCurrentTrack()
-	musicSound.SoundId = MUSIC_TRACK_IDS[currentTrackIndex]
-	musicSound:Play()
-end
-
--- Ended only fires for a track that actually finished naturally (not Looped, since each Sound
--- is single-shot here) -- advance to the next track, wrapping back to 1 after the 3rd.
-musicSound.Ended:Connect(function()
-	currentTrackIndex = (currentTrackIndex % #MUSIC_TRACK_IDS) + 1
-	playCurrentTrack()
-end)
-
-playCurrentTrack()
+musicSound:Play()
 
 -- ===== Shop platform afford / can't-afford base color =====
 -- The shop platforms are shared by every player, so the server can't set one "correct"
@@ -608,10 +589,12 @@ local BUTTON_PRESS_DURATION = 0.15
 -- it from the top if it's re-triggered before finishing, which is fine for a short UI blip.
 local buttonHoverSound = Instance.new("Sound")
 buttonHoverSound.SoundId = "rbxassetid://139800881181209"
+buttonHoverSound.Volume = 2
 buttonHoverSound.Parent = SoundService
 
 local buttonClickSound = Instance.new("Sound")
 buttonClickSound.SoundId = "rbxassetid://88442833509532"
+buttonClickSound.Volume = 2
 buttonClickSound.Parent = SoundService
 
 local function setupButtonPressJuice(button: GuiButton)
@@ -677,6 +660,8 @@ end)
 -- wherever the Dragger ends up. Using AbsolutePosition/AbsoluteSize (real on-screen pixels)
 -- rather than Position directly keeps this correct regardless of what units the drag detector
 -- happens to move it in (Scale vs Offset), since Absolute* is always resolved to real pixels.
+local MUSIC_MAX_VOLUME = 1.0 -- what the slider's fully-right (100%) position actually plays at
+
 local musicBar = settingsPanel.Main.Holder.Music.Bar
 local musicDragger = musicBar.Dragger
 
@@ -686,7 +671,7 @@ local function updateMusicVolumeFromDragger()
 	if draggableWidth > 0 then
 		alpha = (musicDragger.AbsolutePosition.X - musicBar.AbsolutePosition.X) / draggableWidth
 	end
-	musicSound.Volume = math.clamp(alpha, 0, 1)
+	musicSound.Volume = math.clamp(alpha, 0, 1) * MUSIC_MAX_VOLUME
 end
 
 musicDragger:GetPropertyChangedSignal("AbsolutePosition"):Connect(updateMusicVolumeFromDragger)
