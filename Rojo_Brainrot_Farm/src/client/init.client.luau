@@ -576,6 +576,16 @@ local BUTTON_PRESS_SCALE = 0.92
 local BUTTON_HOVER_DURATION = 0.12 -- fast
 local BUTTON_PRESS_DURATION = 0.15
 
+-- Shared, reused across every button rather than one Sound per button -- Play() just restarts
+-- it from the top if it's re-triggered before finishing, which is fine for a short UI blip.
+local buttonHoverSound = Instance.new("Sound")
+buttonHoverSound.SoundId = "rbxassetid://139800881181209"
+buttonHoverSound.Parent = SoundService
+
+local buttonClickSound = Instance.new("Sound")
+buttonClickSound.SoundId = "rbxassetid://88442833509532"
+buttonClickSound.Parent = SoundService
+
 local function setupButtonPressJuice(button: GuiButton)
 	local originalSize = button.Size
 	local hovering = false
@@ -590,6 +600,7 @@ local function setupButtonPressJuice(button: GuiButton)
 
 	button.MouseEnter:Connect(function()
 		hovering = true
+		buttonHoverSound:Play()
 		tweenScale(BUTTON_HOVER_SCALE, BUTTON_HOVER_DURATION):Play()
 	end)
 
@@ -605,6 +616,7 @@ local function setupButtonPressJuice(button: GuiButton)
 	-- back. MouseLeave (above) still overrides at any point, since it just starts a newer tween
 	-- on the same Size property, which cancels whatever this sequence is currently doing.
 	button.MouseButton1Down:Connect(function()
+		buttonClickSound:Play()
 		local shrinkTween = tweenScale(BUTTON_PRESS_SCALE, BUTTON_PRESS_DURATION)
 		shrinkTween:Play()
 		shrinkTween.Completed:Wait()
