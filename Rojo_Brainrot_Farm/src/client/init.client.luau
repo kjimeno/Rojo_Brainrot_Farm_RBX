@@ -659,7 +659,78 @@ local settingsButton = Main.HUD.Right.Settings
 local settingsButtonRestingPosition = settingsButton.Position
 local settingsButtonOpenPosition = settingsButtonRestingPosition + UDim2.new(0, SETTINGS_BUTTON_OPEN_OFFSET_X, 0, 0)
 
+-- Locks the camera at a slightly closer zoom while the panel's open, and stops the player from
+-- scrolling to zoom at all -- Roblox's built-in camera script clamps zoom between
+-- CameraMinZoomDistance and CameraMaxZoomDistance, so setting BOTH to the SAME value both forces
+-- the camera to that exact distance AND leaves no range left for the scroll wheel to move
+-- within. Saves whatever the player's real min/max (AND actual distance) were beforehand so
+-- closing can restore the exact original view, not just Roblox's defaults.
+local SETTINGS_CAMERA_ZOOM_IN_AMOUNT = 5 -- studs closer than however zoomed in the player currently is
+local SETTINGS_CAMERA_MIN_LOCKED_DISTANCE = 3 -- floor so it can't lock in closer than this even if already nearly zoomed in
+local SETTINGS_CAMERA_ZOOM_DURATION = 0.12 -- smooth transition time, both zooming in and back out -- fast
+
+local savedCameraMinZoom = nil
+local savedCameraMaxZoom = nil
+local savedCameraDistance = nil -- the player's actual zoom distance right before opening, restored on close
+
+-- Only the MOST RECENT zoom animation should ever be allowed to keep writing -- opening then
+-- quickly closing (or vice versa) could otherwise leave an OLD lock/unlock loop still running
+-- concurrently with a newer one, both fighting over the same two properties every frame. Without
+-- this, the loser of that race is what caused the camera to visibly settle a bit short of the
+-- real original distance instead of landing exactly back on it.
+local cameraZoomGeneration = 0
+
+-- Smoothly slides the LOCKED zoom distance from `fromDistance` to `toDistance` over `duration`,
+-- setting Min and Max to the same interpolated value every frame. Locking them together each
+-- step (rather than jumping straight to the final boundary) is what makes the transition itself
+-- animate instead of snapping the camera there instantly.
+local function animateCameraZoomLock(fromDistance: number, toDistance: number, duration: number)
+	cameraZoomGeneration += 1
+	local myGeneration = cameraZoomGeneration
+
+	local startTime = os.clock()
+	while true do
+		if cameraZoomGeneration ~= myGeneration then return end -- a newer zoom animation has taken over
+
+		local alpha = math.clamp((os.clock() - startTime) / duration, 0, 1)
+		local distance = fromDistance + (toDistance - fromDistance) * alpha
+		player.CameraMinZoomDistance = distance
+		player.CameraMaxZoomDistance = distance
+		if alpha >= 1 then break end
+		RunService.Heartbeat:Wait()
+	end
+end
+
+local function lockCameraZoomForSettings()
+	savedCameraMinZoom = player.CameraMinZoomDistance
+	savedCameraMaxZoom = player.CameraMaxZoomDistance
+
+	local camera = workspace.CurrentCamera
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local currentDistance = (root and camera) and (camera.CFrame.Position - root.Position).Magnitude or savedCameraMinZoom
+	savedCameraDistance = currentDistance
+
+	local targetDistance = math.max(currentDistance - SETTINGS_CAMERA_ZOOM_IN_AMOUNT, SETTINGS_CAMERA_MIN_LOCKED_DISTANCE)
+	animateCameraZoomLock(currentDistance, targetDistance, SETTINGS_CAMERA_ZOOM_DURATION)
+end
+
+-- Just restoring the saved Min/Max widens the ALLOWED range again, but doesn't move the camera
+-- itself back -- it'd just sit at the tight locked-in distance until the player happened to
+-- scroll it back out manually. Animating back to the actual saved distance FIRST, then
+-- restoring the real min/max afterward, is what actually makes it zoom back out on close.
+local function unlockCameraZoomForSettings()
+	if not savedCameraDistance then return end
+
+	animateCameraZoomLock(player.CameraMinZoomDistance, savedCameraDistance, SETTINGS_CAMERA_ZOOM_DURATION)
+
+	player.CameraMinZoomDistance = savedCameraMinZoom
+	player.CameraMaxZoomDistance = savedCameraMaxZoom
+end
+
 local function openSettingsPanel()
+	task.spawn(lockCameraZoomForSettings) -- runs in parallel, shouldn't delay the panel/button sliding in
+
 	settingsPanel.Position = settingsPanelStartPosition
 	settingsPanel.Visible = true
 	TweenService:Create(
@@ -683,6 +754,8 @@ end
 -- actually there -- so it always ends each close back at the same spot the next open expects to
 -- start from.
 local function closeSettingsPanel()
+	task.spawn(unlockCameraZoomForSettings) -- runs in parallel, shouldn't delay the panel/button sliding out
+
 	settingsButton.Visible = true
 	TweenService:Create(
 		settingsButton,
