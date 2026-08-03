@@ -10,7 +10,7 @@ local Players = game:GetService("Players")
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
-local setupRepeatingTouch = require(script.Parent.RepeatingTouch)
+local RepeatingTouch = require(script.Parent.RepeatingTouch)
 
 local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
 local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
@@ -240,7 +240,7 @@ local function setupDepositArea(plot: Instance)
 
 	ensureDepositEffect(depositPart)
 
-	setupRepeatingTouch(depositPart, function(player)
+	RepeatingTouch.Setup(depositPart, function(player)
 		local data = PlayerDataManager.Get(player)
 		if not data or data.StoredEnergy <= 0 then return end
 
@@ -311,7 +311,7 @@ local function setupCoinVault(plot: Instance)
 
 	ensureCoinVaultBillboard(vault)
 
-	setupRepeatingTouch(vault, function(player)
+	RepeatingTouch.Setup(vault, function(player)
 		local data = PlayerDataManager.Get(player)
 		if not data or data.PendingCash <= 0 then return end
 
@@ -341,13 +341,24 @@ Remotes.UpgradeConversion.OnServerEvent:Connect(function(player)
 end)
 
 -- Step on the UpgradePlatform to buy the same conversion-speed upgrade, no UI needed.
+local UPGRADE_FAST_DEBOUNCE = 0.1 -- seconds between repeat upgrade triggers from the 3rd trigger onward
+
+-- First two triggers keep the normal shared debounce pace; every one after that speeds up to
+-- UPGRADE_FAST_DEBOUNCE while the player keeps standing there.
+local function upgradeDebounceSchedule(triggerCount: number): number
+	if triggerCount <= 2 then
+		return RepeatingTouch.DEFAULT_DEBOUNCE
+	end
+	return UPGRADE_FAST_DEBOUNCE
+end
+
 local function setupUpgradePlatform(plot: Instance)
 	local platform = plot:FindFirstChild("UpgradePlatform")
 	if not platform then return end
 
 	ensureUpgradeBillboard(platform)
 
-	setupRepeatingTouch(platform, function(player)
+	RepeatingTouch.Setup(platform, function(player)
 		local success, resultOrError = tryUpgradeConversion(player)
 		if success then
 			local data = PlayerDataManager.Get(player)
@@ -360,7 +371,7 @@ local function setupUpgradePlatform(plot: Instance)
 				Remotes.MoneyError:FireClient(player)
 			end
 		end
-	end)
+	end, upgradeDebounceSchedule)
 end
 
 -- ===== Init: wire up every plot in the workspace =====

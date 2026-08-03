@@ -17,7 +17,7 @@ local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local EnergyConversionSystem = require(script.Parent.EnergyConversionSystem)
 local MergeSystem = require(script.Parent.MergeSystem)
-local setupRepeatingTouch = require(script.Parent.RepeatingTouch)
+local RepeatingTouch = require(script.Parent.RepeatingTouch)
 
 -- Floating "Buy 5x Noobini Pizzanini / 25 cash" text above a shop platform. Created once per
 -- platform, safe to re-run on server start.
@@ -59,7 +59,19 @@ local function ensureShopBillboard(platform: BasePart, brainrotName: string, qua
 end
 
 local function buyAt(platform: BasePart, player: Player, brainrotName: string, quantity: number)
-	local success, resultOrError = BrainrotSpawner.BuyBrainrot(player, brainrotName, quantity)
+	-- Bulk buys (100+) are always immediately followed by AutoMergeAll below, which calls
+	-- RepackPlot and wipes/rebuilds the whole plot from data regardless -- so physically
+	-- spawning e.g. 100 individual models (each with its own StandPlatform, nameplate, and a
+	-- persistent energy-loop coroutine) just to have them destroyed moments later is pure
+	-- wasted work, repeated on every RepeatingTouch trigger. skipPhysicalSpawn skips straight to
+	-- updating the data and lets RepackPlot do the only spawning that actually ends up visible.
+	-- Only safe when a merge is actually guaranteed to happen afterward though (MergeRequirement
+	-- copies definitely exist at 100+), so max-tier brainrots (no MergeInto, can never merge)
+	-- still spawn normally -- otherwise a bulk buy of those would never visibly appear at all.
+	local config = GameConfig.Brainrots[brainrotName]
+	local skipPhysicalSpawn = quantity >= 100 and config ~= nil and config.MergeInto ~= nil
+
+	local success, resultOrError = BrainrotSpawner.BuyBrainrot(player, brainrotName, quantity, skipPhysicalSpawn)
 
 	if success then
 		local data = PlayerDataManager.Get(player)
@@ -78,7 +90,8 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 		-- several merge groups immediately -- auto-merge everything possible right away instead
 		-- of leaving the player to walk over to the merge platform themselves. (AutoMergeAll
 		-- re-fetches/updates the board and plot itself, so this is safe even though the block
-		-- above just did the same for the plain purchase case.)
+		-- above just did the same for the plain purchase case.) This is also what actually spawns
+		-- anything visible when skipPhysicalSpawn was used above, via its own RepackPlot call.
 		if quantity >= 100 then
 			MergeSystem.AutoMergeAll(player)
 		end
@@ -98,6 +111,17 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 	end
 end
 
+local BULK_BUY_FAST_DEBOUNCE = 0.1 -- seconds between repeat triggers on 100x platforms (and the auto-merges that come with them) from the 3rd trigger onward
+
+-- First two triggers keep the normal shared debounce pace; every one after that speeds up to
+-- BULK_BUY_FAST_DEBOUNCE while the player keeps standing there.
+local function bulkBuyDebounceSchedule(triggerCount: number): number
+	if triggerCount <= 2 then
+		return RepeatingTouch.DEFAULT_DEBOUNCE
+	end
+	return BULK_BUY_FAST_DEBOUNCE
+end
+
 local function setupShopPlatform(platform: BasePart)
 	local brainrotName = platform:GetAttribute("BrainrotName")
 	if not brainrotName then return end
@@ -105,9 +129,13 @@ local function setupShopPlatform(platform: BasePart)
 	local quantity = platform:GetAttribute("Quantity") or 1
 	ensureShopBillboard(platform, brainrotName, quantity)
 
-	setupRepeatingTouch(platform, function(player)
+	-- Only 100x platforms actually trigger the auto-merge side effect (see buyAt above), so only
+	-- those get the speed-up -- 1x/5x/25x platforms stay on the standard flat debounce.
+	local debounceSchedule = (quantity >= 100) and bulkBuyDebounceSchedule or nil
+
+	RepeatingTouch.Setup(platform, function(player)
 		buyAt(platform, player, brainrotName, quantity)
-	end)
+	end, debounceSchedule)
 end
 
 -- Wire up every shop platform that already exists in the workspace (the platforms themselves

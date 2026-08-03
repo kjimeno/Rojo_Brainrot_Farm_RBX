@@ -332,7 +332,16 @@ local function simulateFinalCountAfterMerges(data, addName: string, addQuantity:
 	return total
 end
 
-local function buyBrainrot(player: Player, brainrotName: string, quantity: number?)
+-- `skipPhysicalSpawn`: when true, only updates data.OwnedBrainrots -- no clone/anchor/stand
+-- platform/nameplate/energy-loop per unit. Meant for bulk buys the caller is about to
+-- immediately auto-merge (see ShopPrompts.buyAt): RepackPlot wipes and rebuilds the whole plot
+-- from data moments later regardless, so physically spawning e.g. 100 individual models (each
+-- with its own StandPlatform, nameplate, and a persistent startEnergyLoop coroutine) just to
+-- have RepackPlot immediately destroy them all is pure wasted work -- and since that waste
+-- repeats every single repeat-touch trigger, it's what was actually causing the lag/inconsistency
+-- on the 100x platforms specifically (including a pileup of short-lived energy-loop coroutines
+-- that don't exit until their now-destroyed model's Parent goes nil on their own next wait cycle).
+local function buyBrainrot(player: Player, brainrotName: string, quantity: number?, skipPhysicalSpawn: boolean?)
 	quantity = quantity or 1
 
 	local config = GameConfig.Brainrots[brainrotName]
@@ -354,9 +363,11 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 	end
 
 	-- Cheap up-front feasibility check (also catches a missing/empty BrainrotSlots folder)
-	-- before we touch coins or data. The real per-unit lookup happens in the loop below,
-	-- since occupancy changes as each model gets parented.
-	if not getNextSlot(plot) then
+	-- before we touch coins or data. The real per-unit lookup happens in the loop below, since
+	-- occupancy changes as each model gets parented -- skipped entirely when skipPhysicalSpawn
+	-- is set, since nothing physical gets parented onto a slot in that case at all (the caller's
+	-- immediate RepackPlot lays everything out from data instead, uncapped by physical slots).
+	if not skipPhysicalSpawn and not getNextSlot(plot) then
 		return false, "No free slot on plot"
 	end
 
@@ -371,7 +382,7 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 		local brainrotId = HttpService:GenerateGUID(false)
 		table.insert(data.OwnedBrainrots, { Name = brainrotName, Id = brainrotId })
 
-		if template then
+		if template and not skipPhysicalSpawn then
 			local slot, layer = getNextSlot(plot)
 			if slot then
 				local model = template:Clone()

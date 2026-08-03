@@ -11,7 +11,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local BrainrotSpawner = require(script.Parent.BrainrotSpawner)
-local setupRepeatingTouch = require(script.Parent.RepeatingTouch)
+local RepeatingTouch = require(script.Parent.RepeatingTouch)
 
 local READY_COLOR = Color3.fromRGB(235, 219, 0)
 local NOT_READY_COLOR = Color3.fromRGB(163, 162, 165)
@@ -278,6 +278,17 @@ local function autoMergeAll(player: Player): number
 	return mergeCount
 end
 
+local MERGE_FAST_DEBOUNCE = 0.1 -- seconds between auto-merges from the 3rd trigger onward
+
+-- First two auto-merges keep the normal shared debounce pace; every one after that speeds up to
+-- MERGE_FAST_DEBOUNCE while the player keeps standing there.
+local function mergeDebounceSchedule(triggerCount: number): number
+	if triggerCount <= 2 then
+		return RepeatingTouch.DEFAULT_DEBOUNCE
+	end
+	return MERGE_FAST_DEBOUNCE
+end
+
 local function setupMergePlatform(plot: Instance)
 	local platform = plot:FindFirstChild("MergePlatform")
 	if not platform then return end
@@ -286,9 +297,9 @@ local function setupMergePlatform(plot: Instance)
 	ensureHitEffect(platform)
 	platform.Color = NOT_READY_COLOR
 
-	setupRepeatingTouch(platform, function(player)
+	RepeatingTouch.Setup(platform, function(player)
 		autoMergeAll(player)
-	end)
+	end, mergeDebounceSchedule)
 end
 
 local function initAllMergePlatforms()
