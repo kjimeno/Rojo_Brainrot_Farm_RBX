@@ -341,17 +341,6 @@ Remotes.UpgradeConversion.OnServerEvent:Connect(function(player)
 end)
 
 -- Step on the UpgradePlatform to buy the same conversion-speed upgrade, no UI needed.
-local UPGRADE_FAST_DEBOUNCE = 0.1 -- seconds between repeat upgrade triggers from the 3rd trigger onward
-
--- First two triggers keep the normal shared debounce pace; every one after that speeds up to
--- UPGRADE_FAST_DEBOUNCE while the player keeps standing there.
-local function upgradeDebounceSchedule(triggerCount: number): number
-	if triggerCount <= 2 then
-		return RepeatingTouch.DEFAULT_DEBOUNCE
-	end
-	return UPGRADE_FAST_DEBOUNCE
-end
-
 local function setupUpgradePlatform(plot: Instance)
 	local platform = plot:FindFirstChild("UpgradePlatform")
 	if not platform then return end
@@ -371,7 +360,7 @@ local function setupUpgradePlatform(plot: Instance)
 				Remotes.MoneyError:FireClient(player)
 			end
 		end
-	end, upgradeDebounceSchedule)
+	end)
 end
 
 -- ===== Init: wire up every plot in the workspace =====

@@ -278,17 +278,6 @@ local function autoMergeAll(player: Player): number
 	return mergeCount
 end
 
-local MERGE_FAST_DEBOUNCE = 0.1 -- seconds between auto-merges from the 3rd trigger onward
-
--- First two auto-merges keep the normal shared debounce pace; every one after that speeds up to
--- MERGE_FAST_DEBOUNCE while the player keeps standing there.
-local function mergeDebounceSchedule(triggerCount: number): number
-	if triggerCount <= 2 then
-		return RepeatingTouch.DEFAULT_DEBOUNCE
-	end
-	return MERGE_FAST_DEBOUNCE
-end
-
 local function setupMergePlatform(plot: Instance)
 	local platform = plot:FindFirstChild("MergePlatform")
 	if not platform then return end
@@ -297,9 +286,11 @@ local function setupMergePlatform(plot: Instance)
 	ensureHitEffect(platform)
 	platform.Color = NOT_READY_COLOR
 
+	-- No custom schedule passed -- uses RepeatingTouch's own default (first two triggers at the
+	-- normal pace, then fast).
 	RepeatingTouch.Setup(platform, function(player)
 		autoMergeAll(player)
-	end, mergeDebounceSchedule)
+	end)
 end
 
 local function initAllMergePlatforms()

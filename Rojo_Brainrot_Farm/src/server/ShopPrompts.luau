@@ -111,17 +111,6 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 	end
 end
 
-local BULK_BUY_FAST_DEBOUNCE = 0.1 -- seconds between repeat triggers on 100x platforms (and the auto-merges that come with them) from the 3rd trigger onward
-
--- First two triggers keep the normal shared debounce pace; every one after that speeds up to
--- BULK_BUY_FAST_DEBOUNCE while the player keeps standing there.
-local function bulkBuyDebounceSchedule(triggerCount: number): number
-	if triggerCount <= 2 then
-		return RepeatingTouch.DEFAULT_DEBOUNCE
-	end
-	return BULK_BUY_FAST_DEBOUNCE
-end
-
 local function setupShopPlatform(platform: BasePart)
 	local brainrotName = platform:GetAttribute("BrainrotName")
 	if not brainrotName then return end
@@ -129,13 +118,11 @@ local function setupShopPlatform(platform: BasePart)
 	local quantity = platform:GetAttribute("Quantity") or 1
 	ensureShopBillboard(platform, brainrotName, quantity)
 
-	-- Only 100x platforms actually trigger the auto-merge side effect (see buyAt above), so only
-	-- those get the speed-up -- 1x/5x/25x platforms stay on the standard flat debounce.
-	local debounceSchedule = (quantity >= 100) and bulkBuyDebounceSchedule or nil
-
+	-- No custom schedule passed -- every shop platform (1x/5x/25x/100x alike) uses
+	-- RepeatingTouch's own default: first two triggers at the normal pace, then fast.
 	RepeatingTouch.Setup(platform, function(player)
 		buyAt(platform, player, brainrotName, quantity)
-	end, debounceSchedule)
+	end)
 end
 
 -- Wire up every shop platform that already exists in the workspace (the platforms themselves
