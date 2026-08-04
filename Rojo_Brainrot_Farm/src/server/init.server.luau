@@ -14,7 +14,7 @@ local PlayerDataManager = require(script.PlayerDataManager)
 -- and EnergyConversionSystem don't depend on each other, but MergeSystem needs
 -- BrainrotSpawner already loaded (it calls BrainrotSpawner.StartEnergyLoop), and
 -- ShopPrompts needs both EnergyConversionSystem and MergeSystem already loaded.
-require(script.BrainrotSpawner)
+local BrainrotSpawner = require(script.BrainrotSpawner)
 local EnergyConversionSystem = require(script.EnergyConversionSystem)
 local MergeSystem = require(script.MergeSystem)
 require(script.ShopPrompts)
@@ -54,7 +54,19 @@ end
 -- Load data as soon as a player joins, save + release when they leave.
 Players.PlayerAdded:Connect(function(player)
 	PlayerDataManager.Load(player)
-	assignPlot(player)
+
+	local plot = assignPlot(player)
+	if plot then
+		local data = PlayerDataManager.Get(player)
+		if data then
+			-- Physically spawns everything in data.OwnedBrainrots onto the plot's grid --
+			-- without this, a returning player's saved brainrots never appear until some other
+			-- action (buying, merging) happens to trigger a repack as a side effect.
+			BrainrotSpawner.RepackPlot(player, plot, data)
+			EnergyConversionSystem.UpdateBoard(plot, data)
+			MergeSystem.UpdateMergePlatform(plot, data)
+		end
+	end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
