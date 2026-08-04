@@ -265,6 +265,14 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			energyPart.CFrame = primaryPart.CFrame * CFrame.new(0, ENERGY_DROP_HEIGHT, -ENERGY_DROP_DISTANCE)
 			energyPart.Parent = workspace
 
+			-- Unanchored parts default to Roblox's AUTOMATIC network ownership, which hands
+			-- physics simulation of a part to whichever player is nearest it -- meaning the
+			-- conveyor ride for this specific part can end up depending on that one player's
+			-- connection quality. Forcing server ownership (nil) makes the server itself
+			-- simulate it instead, so it keeps moving smoothly on the belt even if a nearby
+			-- player's connection gets shaky, right up until they actually disconnect.
+			energyPart:SetNetworkOwner(nil)
+
 			-- Player must physically walk into the energy part to collect it.
 			-- Only the owner of the brainrot that produced it can collect it (no stealing, for now).
 			local collected = false
