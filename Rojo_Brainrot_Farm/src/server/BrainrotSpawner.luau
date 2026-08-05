@@ -16,9 +16,10 @@ local PlayerDataManager = require(script.Parent.PlayerDataManager)
 --   ServerStorage/BrainrotModels/<BrainrotName> (one Model per name in GameConfig.Brainrots)
 --   ServerStorage/EnergyPart (a Part representing one unit of energy -- the fallback used by
 --     any tier that doesn't have its own EnergyModels/Tier<N> below)
---   ServerStorage/EnergyModels/Tier<N> (OPTIONAL -- one Part per tier, e.g. "Tier1".."Tier15",
---     for a visually distinct energy drop per brainrot tier. See studio-tools/BuildTieredEnergyParts.luau.
---     Must be a Part, not a Model -- energy pickups use .CFrame/.Touched directly, same as EnergyPart.)
+--   ServerStorage/EnergyModels/Tier<N> (OPTIONAL -- one per tier, e.g. "Tier1".."Tier15", for a
+--     visually distinct energy drop per brainrot tier. See studio-tools/BuildTieredEnergyParts.luau.
+--     Can be either a single Part OR a multi-part Model (e.g. your own custom 3D energy model) --
+--     both are handled below.)
 --   ServerStorage/StandPlatform (OPTIONAL -- a placeholder Part OR Model that spawns underneath
 --     any brainrot in layer 2+ so it isn't floating mid-air. Falls back to a plain grey
 --     generated block if you haven't built one yet -- swap it out any time for your own
@@ -251,18 +252,44 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			energyPart:SetAttribute("EnergyValue", config.EnergyPerDrop)
 			energyPart:SetAttribute("OwnerUserId", player.UserId)
 
-			-- Real physics: it actually falls under gravity and collides with the world
-			-- (your conveyor belt included), instead of being teleported along a scripted path.
-			-- Forced every spawn regardless of how the template itself was authored in Studio.
-			energyPart.Anchored = false
-			energyPart.CanCollide = true
-			if energyPart:IsA("Part") then
-				energyPart.Shape = Enum.PartType.Block
+			-- Works whether the template is a single Part (the original placeholder pickup) or a
+			-- multi-part Model (your own custom 3D energy model) -- every BasePart involved gets
+			-- the same physics/ownership treatment either way, since a Model itself has no
+			-- physics of its own, only its parts do.
+			local energyBaseParts = {}
+			if energyPart:IsA("Model") then
+				for _, descendant in ipairs(energyPart:GetDescendants()) do
+					if descendant:IsA("BasePart") then
+						table.insert(energyBaseParts, descendant)
+					end
+				end
+			elseif energyPart:IsA("BasePart") then
+				table.insert(energyBaseParts, energyPart)
+				-- Only forced for the plain-Part placeholder -- never reshapes your own modeled
+				-- parts, which don't have a Shape to force in the first place.
+				if energyPart:IsA("Part") then
+					energyPart.Shape = Enum.PartType.Block
+				end
 			end
+
+			-- Real physics: it actually falls under gravity and collides with the world (your
+			-- conveyor belt included), instead of being teleported along a scripted path.
+			for _, part in ipairs(energyBaseParts) do
+				part.Anchored = false
+				part.CanCollide = true
+			end
+
 			-- Local -Z is "forward" in Roblox's CFrame convention, so this multiplication spawns
 			-- it ENERGY_DROP_DISTANCE studs out in front of the brainrot (rotated correctly with
-			-- however the model is actually facing) and ENERGY_DROP_HEIGHT studs up.
-			energyPart.CFrame = primaryPart.CFrame * CFrame.new(0, ENERGY_DROP_HEIGHT, -ENERGY_DROP_DISTANCE)
+			-- however the model is actually facing) and ENERGY_DROP_HEIGHT studs up. Models don't
+			-- have a .CFrame property -- PivotTo moves every part together as one, the Model
+			-- equivalent of setting a Part's CFrame directly.
+			local spawnCFrame = primaryPart.CFrame * CFrame.new(0, ENERGY_DROP_HEIGHT, -ENERGY_DROP_DISTANCE)
+			if energyPart:IsA("Model") then
+				energyPart:PivotTo(spawnCFrame)
+			else
+				energyPart.CFrame = spawnCFrame
+			end
 			energyPart.Parent = workspace
 
 			-- Unanchored parts default to Roblox's AUTOMATIC network ownership, which hands
@@ -271,13 +298,19 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 			-- connection quality. Forcing server ownership (nil) makes the server itself
 			-- simulate it instead, so it keeps moving smoothly on the belt even if a nearby
 			-- player's connection gets shaky, right up until they actually disconnect.
-			energyPart:SetNetworkOwner(nil)
+			for _, part in ipairs(energyBaseParts) do
+				part:SetNetworkOwner(nil)
+			end
 
-			-- Player must physically walk into the energy part to collect it.
+			-- Player must physically walk into the energy part to collect it. Touched only
+			-- exists on BasePart, so for a multi-part Model this listens on EVERY part in it --
+			-- touching ANY of them collects the whole thing, sharing one `collected` flag so
+			-- only the first contact (across all parts) actually counts.
 			-- Only the owner of the brainrot that produced it can collect it (no stealing, for now).
 			local collected = false
-			local touchConnection
-			touchConnection = energyPart.Touched:Connect(function(hit)
+			local touchConnections = {}
+
+			local function onEnergyTouched(hit: BasePart)
 				if collected then return end
 
 				local character = hit.Parent
@@ -291,15 +324,23 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 					Remotes.StatsUpdate:FireClient(touchingPlayer, { StoredEnergy = data.StoredEnergy })
 				end
 
-				if touchConnection then touchConnection:Disconnect() end
+				for _, connection in ipairs(touchConnections) do
+					connection:Disconnect()
+				end
 				energyPart:Destroy()
-			end)
+			end
+
+			for _, part in ipairs(energyBaseParts) do
+				table.insert(touchConnections, part.Touched:Connect(onEnergyTouched))
+			end
 
 			-- No more scripted CFrame tweening down a conveyor -- your real conveyor belt will
 			-- move it via actual physics once it's built. This is just a cleanup timer so an
 			-- uncollected drop doesn't sit in the world forever.
 			task.delay(ENERGY_PART_LIFETIME, function()
-				if touchConnection then touchConnection:Disconnect() end
+				for _, connection in ipairs(touchConnections) do
+					connection:Disconnect()
+				end
 				if energyPart.Parent and not collected then
 					energyPart:Destroy()
 				end
