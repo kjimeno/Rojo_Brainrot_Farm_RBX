@@ -274,9 +274,21 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 
 			-- Real physics: it actually falls under gravity and collides with the world (your
 			-- conveyor belt included), instead of being teleported along a scripted path.
+			-- Elasticity forced to 0 (with a high ElasticityWeight so it actually wins over
+			-- whatever the belt/ground's own elasticity is, since Roblox combines both
+			-- surfaces' values) -- imported 3D models can come in with some nonzero bounciness
+			-- baked into their physical properties, which is what causes visible bouncing on
+			-- impact instead of just landing and riding the belt.
 			for _, part in ipairs(energyBaseParts) do
 				part.Anchored = false
 				part.CanCollide = true
+				part.CustomPhysicalProperties = PhysicalProperties.new(
+					part.CustomPhysicalProperties and part.CustomPhysicalProperties.Density or 0.7,
+					part.CustomPhysicalProperties and part.CustomPhysicalProperties.Friction or 0.3,
+					0, -- Elasticity
+					1, -- FrictionWeight
+					100 -- ElasticityWeight
+				)
 			end
 
 			-- Local -Z is "forward" in Roblox's CFrame convention, so this multiplication spawns
