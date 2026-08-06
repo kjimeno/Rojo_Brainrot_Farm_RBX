@@ -272,6 +272,24 @@ local function startEnergyLoop(player: Player, brainrotModel: Model, brainrotNam
 				end
 			end
 
+			-- Custom multi-part 3D models aren't guaranteed to already be welded together --
+			-- an unwelded model falling apart under its own physics the instant it's unanchored
+			-- looks exactly like violent, chaotic bouncing (each part reacting individually,
+			-- often shoving through/past its neighbors to resolve tiny overlaps baked into the
+			-- model), completely separate from any Elasticity setting. WeldConstraint locks every
+			-- part to the first one as a single rigid body regardless of how it was set up.
+			-- Done here, before anything is unanchored/parented to workspace, so nothing has a
+			-- chance to move relative to anything else first.
+			if energyPart:IsA("Model") and #energyBaseParts > 1 then
+				local rootPart = energyBaseParts[1]
+				for i = 2, #energyBaseParts do
+					local weld = Instance.new("WeldConstraint")
+					weld.Part0 = rootPart
+					weld.Part1 = energyBaseParts[i]
+					weld.Parent = rootPart
+				end
+			end
+
 			-- Real physics: it actually falls under gravity and collides with the world (your
 			-- conveyor belt included), instead of being teleported along a scripted path.
 			-- Elasticity forced to 0 (with a high ElasticityWeight so it actually wins over
