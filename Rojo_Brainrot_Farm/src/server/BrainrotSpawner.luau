@@ -134,6 +134,31 @@ local function brainrotSpawnCFrame(slot: Instance, layer: number, brainrotName: 
 	return slotCFrame(slot, layer) * CFrame.Angles(0, math.rad(facingOffset), 0)
 end
 
+-- How far a model's PrimaryPart sits above its own lowest point (its "feet"), measured from its
+-- current world bounding box. PrimaryPart is rarely placed exactly at floor level -- often hip/
+-- torso height for a humanoid rig -- so positioning a model by its PrimaryPart CFrame directly
+-- (as SetPrimaryPartCFrame does below) buries that offset straight into the ground. This is why
+-- only SOME brainrots looked sunken: it depends entirely on where each individual model's own
+-- PrimaryPart happens to sit, which varies model to model. Translation-invariant (moving the
+-- whole model doesn't change the gap between PrimaryPart and its own lowest point), so it's safe
+-- to measure before positioning and apply the result as a Y offset on the target CFrame.
+local function getFeetOffset(model: Model): number
+	local primaryPart = model.PrimaryPart
+	if not primaryPart then return 0 end
+	local boundingCFrame, boundingSize = model:GetBoundingBox()
+	return primaryPart.Position.Y - (boundingCFrame.Position.Y - boundingSize.Y / 2)
+end
+
+-- Manual per-model fine-tune on top of getFeetOffset above, for whenever the automatic bounding-
+-- box math doesn't land exactly right (e.g. a mesh with a shadow/decal hanging below its visual
+-- feet, or an odd collision shape throwing the bounding box off). Set a "FeetOffset" number
+-- attribute directly on the model in ServerStorage/BrainrotModels/<name> in Studio -- positive
+-- raises it, negative lowers it. Attributes clone along with everything else, so this only ever
+-- needs to be set once on the template. Defaults to 0 (no manual nudge) if never set.
+local function getManualFeetOffset(model: Model): number
+	return model:GetAttribute("FeetOffset") or 0
+end
+
 -- Fallback size/color for the generated placeholder stand platform, only used when
 -- ServerStorage/StandPlatform doesn't exist yet.
 local STAND_PLATFORM_THICKNESS = 1
@@ -469,7 +494,9 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 				model:SetAttribute("OwnerUserId", player.UserId)
 				anchorModel(model)
 				if model.PrimaryPart then
-					model:SetPrimaryPartCFrame(brainrotSpawnCFrame(slot, layer :: number, brainrotName))
+					local targetCFrame = brainrotSpawnCFrame(slot, layer :: number, brainrotName)
+					local yOffset = getFeetOffset(model) + getManualFeetOffset(model)
+					model:SetPrimaryPartCFrame(targetCFrame + Vector3.new(0, yOffset, 0))
 				end
 				model.Parent = slot
 				addStandPlatform(model, slot, layer :: number)
@@ -529,7 +556,9 @@ local function repackPlot(player: Player, plot: Instance, data)
 			model:SetAttribute("OwnerUserId", player.UserId)
 			anchorModel(model)
 			if model.PrimaryPart then
-				model:SetPrimaryPartCFrame(brainrotSpawnCFrame(slot, layer, entry.Name))
+				local targetCFrame = brainrotSpawnCFrame(slot, layer, entry.Name)
+				local yOffset = getFeetOffset(model) + getManualFeetOffset(model)
+				model:SetPrimaryPartCFrame(targetCFrame + Vector3.new(0, yOffset, 0))
 			end
 			model.Parent = slot
 			addStandPlatform(model, slot, layer)
