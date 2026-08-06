@@ -11,15 +11,11 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local RepeatingTouch = {}
 
-RepeatingTouch.DEFAULT_DEBOUNCE = 1.0 -- seconds between the first two repeats, for as long as they keep standing there
-RepeatingTouch.FAST_DEBOUNCE = 0.1 -- seconds between every repeat after that
+RepeatingTouch.FAST_DEBOUNCE = 0.4 -- seconds between every repeat, for as long as they keep standing there
 
--- The built-in default schedule every platform gets unless it passes its own: first two
--- triggers at the normal pace, then speeds up to FAST_DEBOUNCE from the 3rd trigger onward.
+-- The built-in default schedule every platform gets unless it passes its own: one flat pace,
+-- no ramp-up -- steady FAST_DEBOUNCE from the very first repeat.
 local function defaultDebounceSchedule(triggerCount: number): number
-	if triggerCount <= 2 then
-		return RepeatingTouch.DEFAULT_DEBOUNCE
-	end
 	return RepeatingTouch.FAST_DEBOUNCE
 end
 
@@ -29,8 +25,8 @@ end
 --
 -- `debounceSchedule` is optional: a function (triggerCount: number) -> number, called after each
 -- trigger with how many times `action` has fired so far (1 for the very first), returning how
--- long to wait before the next one. Defaults to defaultDebounceSchedule above (first two normal,
--- then fast) if omitted -- pass your own only if a platform needs different pacing.
+-- long to wait before the next one. Defaults to defaultDebounceSchedule above (flat FAST_DEBOUNCE
+-- pace throughout) if omitted -- pass your own only if a platform needs different pacing.
 --
 -- Touched/TouchEnded fire per BODY PART, not per player -- a standing character has several
 -- parts (arms, legs, torso) that can individually flicker on/off contact from idle animation

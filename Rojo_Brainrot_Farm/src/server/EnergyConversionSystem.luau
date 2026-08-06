@@ -77,70 +77,97 @@ local function getPlayerPlot(player: Player)
 	return nil
 end
 
--- Refreshes the physical SurfaceGui board on the player's plot (built manually in Studio
--- somewhere under <plot>/ConversionBoard) to reflect current silo/rate numbers. Three
--- separate TextLabels, found recursively since their exact nesting depends on your board's
--- own model structure:
---   TitleLabel  -- static "Converting Energy" heading
---   EnergyLabel -- how much SiloEnergy is left to convert
---   RateLabel   -- the conversion rate, "X per second"
--- Only .Text is ever touched -- color each one however you want in Studio and it'll stick.
-local function updateBoard(plot: Instance, data)
+-- updateBoard runs on every RepeatingTouch trigger for several platforms -- including the
+-- x100 shop platform, which also fires RepackPlot (destroys/reclones up to MaxBrainrotsPerPlot
+-- models, each with its own nameplate/stand platform) far more than any other platform does.
+-- FindFirstChild(name, true) walks the ENTIRE descendant tree looking for `name`, so its cost
+-- scales with however many Instances currently sit under the plot -- which spikes hard right
+-- after a repack. Re-running 5 of those recursive searches on every single trigger is what
+-- actually caused the "x100 is inconsistent" lag: not a fixed cost, but one that gets worse
+-- exactly when RepackPlot has just churned the tree, then eases off again -- read as jitter.
+-- The board/vault/upgrade Instances themselves are static plot furniture (built once in
+-- Studio, never touched by RepackPlot, which only ever destroys/recreates children of
+-- BrainrotSlots), so it's safe to look them up ONCE per plot and reuse the references forever.
+local boardRefsCache = {} -- [plot] = cached lookup table, built the first time updateBoard runs for that plot
+
+local function getBoardRefs(plot: Instance)
+	local cached = boardRefsCache[plot]
+	if cached then return cached end
+
 	local board = plot:FindFirstChild("ConversionBoard", true)
 	if not board then
 		warn("[EnergyConversionSystem] No ConversionBoard found under " .. plot.Name)
-		return
+		return nil
 	end
 
 	local surfaceGui = board:FindFirstChildWhichIsA("SurfaceGui", true)
 	if not surfaceGui then
 		warn("[EnergyConversionSystem] ConversionBoard under " .. plot.Name .. " has no SurfaceGui descendant")
-		return
+		return nil
 	end
 
-	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
-
-	local boardTitleLabel = surfaceGui:FindFirstChild("TitleLabel", true)
-	if boardTitleLabel then
-		boardTitleLabel.Text = (data.SiloEnergy > 0) and "Converting Energy" or "No Energy"
-	end
-
-	local boardEnergyLabel = surfaceGui:FindFirstChild("EnergyLabel", true)
-	if boardEnergyLabel then
-		boardEnergyLabel.Text = GameConfig.FormatAbbreviatedNumber(data.SiloEnergy)
-	else
+	local refs = {
+		TitleLabel = surfaceGui:FindFirstChild("TitleLabel", true),
+		EnergyLabel = surfaceGui:FindFirstChild("EnergyLabel", true),
+		RateLabel = surfaceGui:FindFirstChild("RateLabel", true),
+	}
+	if not refs.EnergyLabel then
 		warn("[EnergyConversionSystem] ConversionBoard on " .. plot.Name .. " has no EnergyLabel")
 	end
-
-	local boardRateLabel = surfaceGui:FindFirstChild("RateLabel", true)
-	if boardRateLabel then
-		boardRateLabel.Text = ("%s per Second"):format(GameConfig.FormatAbbreviatedRate(rate))
-	else
+	if not refs.RateLabel then
 		warn("[EnergyConversionSystem] ConversionBoard on " .. plot.Name .. " has no RateLabel")
 	end
 
 	local vault = plot:FindFirstChild("CoinVault")
 	local cashBillboard = vault and vault:FindFirstChild("CashVaultBillboard")
-	local amountLabel = cashBillboard and cashBillboard:FindFirstChild("AmountLabel")
-	if amountLabel then
-		amountLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(data.PendingCash))
-	end
+	refs.AmountLabel = cashBillboard and cashBillboard:FindFirstChild("AmountLabel")
 
 	local upgradePlatform = plot:FindFirstChild("UpgradePlatform")
 	if upgradePlatform then
+		refs.UpgradePlatform = upgradePlatform
 		local upgradeBillboard = upgradePlatform:FindFirstChild("UpgradeBillboard")
-		local rateLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("RateLabel")
-		local costLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("CostLabel")
+		refs.UpgradeRateLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("RateLabel")
+		refs.UpgradeCostLabel = upgradeBillboard and upgradeBillboard:FindFirstChild("CostLabel")
+	end
 
+	boardRefsCache[plot] = refs
+	return refs
+end
+
+-- Refreshes the physical SurfaceGui board on the player's plot to reflect current silo/rate
+-- numbers, plus the coin vault and upgrade platform billboards. Only .Text/.Color are ever
+-- touched -- style each label however you want in Studio and it'll stick.
+local function updateBoard(plot: Instance, data)
+	local refs = getBoardRefs(plot)
+	if not refs then return end
+
+	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
+
+	if refs.TitleLabel then
+		refs.TitleLabel.Text = (data.SiloEnergy > 0) and "Converting Energy" or "No Energy"
+	end
+	if refs.EnergyLabel then
+		refs.EnergyLabel.Text = GameConfig.FormatAbbreviatedNumber(data.SiloEnergy)
+	end
+	if refs.RateLabel then
+		refs.RateLabel.Text = ("%s per Second"):format(GameConfig.FormatAbbreviatedRate(rate))
+	end
+	if refs.AmountLabel then
+		refs.AmountLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(data.PendingCash))
+	end
+
+	if refs.UpgradePlatform then
 		-- No level cap -- both the rate increase AND the cost grow with each purchase (RateGrowth
 		-- / CostGrowth respectively), so both lines have to be recomputed from the player's
 		-- current level every time, not baked in once when the billboard was first created.
-		if rateLabel then
-			rateLabel.Text = ("+%s per second"):format(GameConfig.FormatAbbreviatedRate(GameConfig.GetNextRateIncrease(data.ConversionLevel)))
+		if refs.UpgradeRateLabel then
+			refs.UpgradeRateLabel.Text = ("+%s per second"):format(GameConfig.FormatAbbreviatedRate(GameConfig.GetNextRateIncrease(data.ConversionLevel)))
 		end
 		local cost = GameConfig.GetUpgradeCost(data.ConversionLevel)
-		if costLabel then costLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(cost)) end
-		upgradePlatform.Color = (data.Cash >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
+		if refs.UpgradeCostLabel then
+			refs.UpgradeCostLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(cost))
+		end
+		refs.UpgradePlatform.Color = (data.Cash >= cost) and AFFORD_COLOR or CANT_AFFORD_COLOR
 	end
 end
 
