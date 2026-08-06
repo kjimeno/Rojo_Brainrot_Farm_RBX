@@ -229,25 +229,102 @@ end
 -- Merges every complete group of GameConfig.MergeRequirement, at EVERY tier, cascading all
 -- the way up to tier 15 in one call. GameConfig.BrainrotOrder lists tiers low-to-high, and this
 -- drains a tier's triples into the next tier before moving on to process that next tier --
--- so 9 owned tier-1 brainrots become 3 tier-2 becomes 1 tier-3, all within this single pass,
--- since each tier's newly-created entries are already in data.OwnedBrainrots by the time we
--- get to processing that tier.
+-- so 9 owned tier-1 brainrots become 3 tier-2 becomes 1 tier-3, all within this single pass.
+--
+-- Buckets data.OwnedBrainrots by name ONCE up front (O(N)), then pops/pushes ids within each
+-- bucket -- always from the END of that bucket's own small array, so O(1) per id -- instead of
+-- mergeIds/findMatchingIds' approach of re-scanning the ENTIRE OwnedBrainrots list from scratch
+-- for every single merge, plus an O(N) table.remove-from-the-middle for each of the 3 ids
+-- consumed. That old approach costs O(mergeCount x N) total, which is fine for a handful of
+-- merges but not for the dozens per trigger a big 100x buy can produce against a large,
+-- ever-growing inventory -- and since N grows over a session, the delay got progressively worse
+-- rather than staying constant, which is exactly the "sometimes delayed" symptom. This rebuilds
+-- data.OwnedBrainrots from the buckets ONCE at the end (O(N)) instead.
 local function mergeAllPossible(data): number
+	local idsByName: { [string]: { string } } = {}
+	for _, entry in ipairs(data.OwnedBrainrots) do
+		local bucket = idsByName[entry.Name]
+		if not bucket then
+			bucket = {}
+			idsByName[entry.Name] = bucket
+		end
+		table.insert(bucket, entry.Id)
+	end
+
 	local mergeCount = 0
 	for _, brainrotName in ipairs(GameConfig.BrainrotOrder) do
-		while true do
-			local ids = findMatchingIds(data, brainrotName, GameConfig.MergeRequirement)
-			if #ids < GameConfig.MergeRequirement then break end
+		local config = GameConfig.Brainrots[brainrotName]
+		local bucket = idsByName[brainrotName]
 
-			local success, resultOrError = mergeIds(data, ids)
-			if not success then
-				warn(("[Merge] merge stopped early for %s: %s"):format(brainrotName, tostring(resultOrError)))
-				break
+		while config and config.MergeInto and bucket and #bucket >= GameConfig.MergeRequirement do
+			for _ = 1, GameConfig.MergeRequirement do
+				table.remove(bucket) -- from the end -- O(1), no shifting
 			end
+
+			local nextBucket = idsByName[config.MergeInto]
+			if not nextBucket then
+				nextBucket = {}
+				idsByName[config.MergeInto] = nextBucket
+			end
+			table.insert(nextBucket, HttpService:GenerateGUID(false))
+
 			mergeCount += 1
 		end
 	end
+
+	if mergeCount > 0 then
+		local rebuilt = {}
+		for name, ids in pairs(idsByName) do
+			for _, id in ipairs(ids) do
+				table.insert(rebuilt, { Name = name, Id = id })
+			end
+		end
+		data.OwnedBrainrots = rebuilt
+	end
+
 	return mergeCount
+end
+
+-- RepackPlot destroys and re-clones EVERY brainrot model on the whole plot (up to
+-- MaxBrainrotsPerPlot), each one spawning its own persistent energy-loop coroutine -- real,
+-- heavy Instance churn. A rapid-fire trigger source (the x100 shop platform ramping down to a
+-- 0.1s debounce) can call autoMergeAll far more often than a player could ever actually perceive
+-- a plot rebuild, so doing a full repack on EVERY single trigger just piles up wasted work and
+-- reads as lag/inconsistency. This throttles it to at most one real repack per
+-- REPACK_THROTTLE_INTERVAL: calls within that window get coalesced into a single trailing repack
+-- (using whatever data is current when it actually fires) instead of each one doing its own.
+local REPACK_THROTTLE_INTERVAL = 0.3 -- seconds
+local lastRepackTime = {} -- [player] = os.clock() of the last actual RepackPlot call
+local repackPending = {} -- [player] = true while a trailing repack is already scheduled
+
+Players.PlayerRemoving:Connect(function(player)
+	lastRepackTime[player] = nil
+	repackPending[player] = nil
+end)
+
+local function requestPlotRepack(player: Player, plot: Instance, data)
+	local now = os.clock()
+	local last = lastRepackTime[player]
+
+	if not last or (now - last) >= REPACK_THROTTLE_INTERVAL then
+		lastRepackTime[player] = now
+		BrainrotSpawner.RepackPlot(player, plot, data)
+		return
+	end
+
+	if repackPending[player] then return end -- a trailing repack is already queued -- it'll pick up this state too
+	repackPending[player] = true
+	task.delay(REPACK_THROTTLE_INTERVAL - (now - last), function()
+		repackPending[player] = nil
+		lastRepackTime[player] = os.clock()
+		-- Re-fetch fresh rather than closing over the stale `data`/`plot` from whichever call
+		-- scheduled this -- more merges (or the player leaving) may have happened in the meantime.
+		local freshData = PlayerDataManager.Get(player)
+		local freshPlot = getPlayerPlot(player)
+		if freshData and freshPlot then
+			BrainrotSpawner.RepackPlot(player, freshPlot, freshData)
+		end
+	end)
 end
 
 -- Merges every possible group across all tiers for `player`, repacks their plot, plays the
@@ -265,11 +342,11 @@ local function autoMergeAll(player: Player): number
 	-- own plot, regardless of where the triggering action happened.
 	local plot = getPlayerPlot(player)
 	if plot then
-		-- Burst fires first so it's instant -- RepackPlot below rebuilds every brainrot model
-		-- on the whole plot, which can take a noticeable moment with a large inventory, and
-		-- shouldn't delay the visual feedback.
+		-- Burst fires immediately every time, even when the repack itself is throttled -- the
+		-- particle burst is cheap and gives instant feedback regardless of how often the actual
+		-- (expensive) visual rebuild runs.
 		playMergeEffect(plot)
-		BrainrotSpawner.RepackPlot(player, plot, data)
+		requestPlotRepack(player, plot, data)
 		updateMergePlatformState(plot, data)
 	end
 	Remotes.MergeBrainrots:FireClient(player, true, mergeCount)
