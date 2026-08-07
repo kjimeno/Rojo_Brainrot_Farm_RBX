@@ -14,6 +14,7 @@ local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 
 local cash = 0
+local shopTier = 1
 
 -- ===== Background music: just track 1, looping =====
 local musicSound = Instance.new("Sound")
@@ -32,17 +33,28 @@ musicSound:Play()
 local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
 local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
 
--- platform Part -> total price it represents
+-- platform Part -> { quantity: number, brainrotName: string? } -- brainrotName nil means
+-- "FollowsShopTier": look up GameConfig.BrainrotOrder[shopTier] fresh every time instead of a
+-- price fixed at track time, so these stay correct as shopTier changes (see StatsUpdate below).
 local trackedShopPlatforms = {}
 
-local function colorShopPlatform(platform: BasePart, totalPrice: number)
+local function getShopPlatformTotalPrice(entry): number?
+	local brainrotName = entry.brainrotName or GameConfig.BrainrotOrder[shopTier] or GameConfig.BrainrotOrder[1]
+	local config = GameConfig.Brainrots[brainrotName]
+	if not config then return nil end
+	return config.Price * entry.quantity
+end
+
+local function colorShopPlatform(platform: BasePart, entry)
+	local totalPrice = getShopPlatformTotalPrice(entry)
+	if not totalPrice then return end
 	platform.Color = (cash >= totalPrice) and AFFORD_COLOR or CANT_AFFORD_COLOR
 end
 
 local function refreshAllShopPlatforms()
-	for platform, totalPrice in pairs(trackedShopPlatforms) do
+	for platform, entry in pairs(trackedShopPlatforms) do
 		if platform.Parent then
-			colorShopPlatform(platform, totalPrice)
+			colorShopPlatform(platform, entry)
 		else
 			trackedShopPlatforms[platform] = nil
 		end
@@ -51,15 +63,22 @@ end
 
 local function trackShopPlatform(instance: Instance)
 	if not instance:IsA("BasePart") then return end
+	local quantity = instance:GetAttribute("Quantity") or 1
+
+	if instance:GetAttribute("FollowsShopTier") then
+		local entry = { quantity = quantity, brainrotName = nil }
+		trackedShopPlatforms[instance] = entry
+		colorShopPlatform(instance, entry)
+		return
+	end
+
 	local brainrotName = instance:GetAttribute("BrainrotName")
 	if not brainrotName then return end
+	if not GameConfig.Brainrots[brainrotName] then return end
 
-	local config = GameConfig.Brainrots[brainrotName]
-	if not config then return end
-
-	local quantity = instance:GetAttribute("Quantity") or 1
-	trackedShopPlatforms[instance] = config.Price * quantity
-	colorShopPlatform(instance, config.Price * quantity)
+	local entry = { quantity = quantity, brainrotName = brainrotName }
+	trackedShopPlatforms[instance] = entry
+	colorShopPlatform(instance, entry)
 end
 
 for _, descendant in ipairs(workspace:GetDescendants()) do
@@ -537,6 +556,11 @@ end
 Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 	if stats.Cash ~= nil then
 		cash = stats.Cash
+		refreshAllShopPlatforms()
+	end
+
+	if stats.ShopTier ~= nil then
+		shopTier = stats.ShopTier
 		refreshAllShopPlatforms()
 	end
 

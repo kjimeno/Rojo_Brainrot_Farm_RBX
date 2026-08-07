@@ -72,7 +72,7 @@ local function ensureShopBillboard(platform: BasePart, brainrotName: string, qua
 		local config = GameConfig.Brainrots[brainrotName]
 		if not config then return end
 		nameLabel.Text = ("Buy %dx %s"):format(quantity, brainrotName)
-		priceLabel.Text = ("%s cash"):format(GameConfig.FormatAbbreviatedNumber(config.Price * quantity))
+		priceLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(config.Price * quantity))
 	end
 	updateNow()
 end
@@ -94,7 +94,7 @@ local function updateShopBillboardText(platform: BasePart, brainrotName: string,
 	end
 	local priceLabel = billboard:FindFirstChild("PriceLabel")
 	if priceLabel then
-		priceLabel.Text = ("%s cash"):format(GameConfig.FormatAbbreviatedNumber(totalPrice))
+		priceLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(totalPrice))
 	end
 	platform.Color = (cash >= totalPrice) and AFFORD_COLOR or CANT_AFFORD_COLOR
 end
