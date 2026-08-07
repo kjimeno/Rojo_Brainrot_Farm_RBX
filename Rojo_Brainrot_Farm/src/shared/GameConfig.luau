@@ -153,6 +153,25 @@ end
 -- How many of the same tier are needed to merge into the next tier
 GameConfig.MergeRequirement = 3
 
+-- ============ SHOP TIER PROGRESSION ============
+-- Which brainrot the FollowsShopTier-tagged shop platforms (x1/x5/x25/x100) actually sell is a
+-- per-player unlock (data.ShopTier, starts at 1 -- see PlayerDataManager) rather than fixed --
+-- pay at the ShopTierUpgradePlatform to raise it by one, up to #BrainrotOrder. The cost of
+-- unlocking the NEXT tier is pegged directly to that tier's own Price above (rather than a
+-- separate hand-tuned curve), so it automatically follows however Brainrots' Price column gets
+-- tuned instead of drifting out of sync with it -- unlocking costs roughly what buying a full
+-- x100 at your CURRENT tier would.
+GameConfig.ShopTierUpgrade = {
+	PriceMultiplier = 100,
+}
+
+function GameConfig.GetShopTierUpgradeCost(currentTier: number): number
+	local currentBrainrotName = GameConfig.BrainrotOrder[currentTier]
+	local currentConfig = currentBrainrotName and GameConfig.Brainrots[currentBrainrotName]
+	local price = (currentConfig and currentConfig.Price) or 0
+	return math.floor(price * GameConfig.ShopTierUpgrade.PriceMultiplier)
+end
+
 -- ============ ENERGY -> COIN CONVERSION ============
 -- No cap on the silo -- depositing always moves your entire carried StoredEnergy in at once.
 GameConfig.BaseConversionRate = 1

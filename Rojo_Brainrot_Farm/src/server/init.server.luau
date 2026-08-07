@@ -17,7 +17,7 @@ local PlayerDataManager = require(script.PlayerDataManager)
 local BrainrotSpawner = require(script.BrainrotSpawner)
 local EnergyConversionSystem = require(script.EnergyConversionSystem)
 local MergeSystem = require(script.MergeSystem)
-require(script.ShopPrompts)
+local ShopPrompts = require(script.ShopPrompts)
 
 -- ===== Basic first-come-first-served plot assignment =====
 -- Good enough for solo/small-group testing. Replace with persistent per-player plots later
@@ -106,6 +106,7 @@ Remotes.RequestStats.OnServerEvent:Connect(function(player)
 		SiloEnergy = data.SiloEnergy,
 		Cash = data.Cash,
 		PendingCash = data.PendingCash,
+		ShopTier = data.ShopTier,
 	})
 
 	local plot = EnergyConversionSystem.GetPlayerPlot(player)
@@ -113,6 +114,8 @@ Remotes.RequestStats.OnServerEvent:Connect(function(player)
 		EnergyConversionSystem.UpdateBoard(plot, data)
 		MergeSystem.UpdateMergePlatform(plot, data)
 	end
+	ShopPrompts.RefreshShopTierUpgradeDisplay(player)
+	ShopPrompts.RefreshFollowingShopStalls(player)
 end)
 
 print("[Server] Brainrot Tycoon systems initialized.")

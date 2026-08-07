@@ -11,6 +11,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PlayerDataManager = require(script.Parent.PlayerDataManager)
 local RepeatingTouch = require(script.Parent.RepeatingTouch)
+local PlayerDataSignals = require(script.Parent.PlayerDataSignals)
 
 local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
 local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
@@ -351,6 +352,7 @@ local function setupCoinVault(plot: Instance)
 		-- effect, only on the specific update where an actual vault collection just happened.
 		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash, PendingCash = 0, VaultCollectedAmount = collectedAmount })
 		updateBoard(plot, data)
+		PlayerDataSignals.FireCashChanged(player)
 	end)
 end
 
@@ -364,6 +366,7 @@ Remotes.UpgradeConversion.OnServerEvent:Connect(function(player)
 		if plot then
 			updateBoard(plot, PlayerDataManager.Get(player))
 		end
+		PlayerDataSignals.FireCashChanged(player)
 	end
 end)
 
@@ -380,6 +383,7 @@ local function setupUpgradePlatform(plot: Instance)
 			local data = PlayerDataManager.Get(player)
 			Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash })
 			updateBoard(plot, data)
+			PlayerDataSignals.FireCashChanged(player)
 			print(("[Upgrade] %s bought conversion level %s"):format(player.Name, tostring(resultOrError)))
 		else
 			print(("[Upgrade] %s failed to buy conversion upgrade: %s"):format(player.Name, tostring(resultOrError)))
