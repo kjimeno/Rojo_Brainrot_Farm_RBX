@@ -10,13 +10,13 @@ PlayerDataManager.Cache = {} -- [player] = dataTable
 local DataStore = DataStoreService:GetDataStore("BrainrotTycoon_v1")
 
 local DEFAULT_DATA = {
-	Cash = 20000000,
+	Cash = 5,
 	StoredEnergy = 0,
 	SiloEnergy = 0,
 	PendingCash = 0,
 	ConversionLevel = 0,
 	ShopTier = 1, -- which brainrot the FollowsShopTier shop platforms sell: GameConfig.BrainrotOrder[ShopTier]
-	OwnedBrainrots = {}, -- { {Name = "Noobini Pizzanini", Id = "uuid"}, ... }
+	OwnedBrainrots = {}, -- { {Name = "Noobini Pizzanini", Id = "uuid"}, ... } -- also what GameConfig.GetTotalBrainrotValue reads
 }
 
 local function deepCopy(t)

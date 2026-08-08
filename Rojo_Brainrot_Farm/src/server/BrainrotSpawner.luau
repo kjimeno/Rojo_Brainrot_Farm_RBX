@@ -454,7 +454,8 @@ local function buyBrainrot(player: Player, brainrotName: string, quantity: numbe
 	local data = PlayerDataManager.Get(player)
 	if not data then return false, "Data not loaded" end
 
-	local totalPrice = config.Price * quantity
+	local totalValue = GameConfig.GetTotalBrainrotValue(data.OwnedBrainrots)
+	local totalPrice = GameConfig.GetBrainrotBulkPrice(brainrotName, totalValue, quantity)
 	if data.Cash < totalPrice then
 		return false, "Not enough cash"
 	end

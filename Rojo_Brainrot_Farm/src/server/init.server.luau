@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PlayerDataManager = require(script.PlayerDataManager)
 
 -- Requiring these modules runs their top-level code, which wires up all the
@@ -107,6 +108,7 @@ Remotes.RequestStats.OnServerEvent:Connect(function(player)
 		Cash = data.Cash,
 		PendingCash = data.PendingCash,
 		ShopTier = data.ShopTier,
+		TotalBrainrotValue = GameConfig.GetTotalBrainrotValue(data.OwnedBrainrots),
 	})
 
 	local plot = EnergyConversionSystem.GetPlayerPlot(player)

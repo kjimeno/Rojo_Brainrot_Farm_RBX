@@ -69,25 +69,30 @@ local function ensureShopBillboard(platform: BasePart, brainrotName: string, qua
 	priceLabel.Parent = billboard
 
 	local function updateNow()
-		local config = GameConfig.Brainrots[brainrotName]
-		if not config then return end
+		if not GameConfig.Brainrots[brainrotName] then return end
+		-- No specific player known yet at setup time -- shows the base price (totalValue = 0) as
+		-- a placeholder, same as the tier-1 placeholder FollowsShopTier stalls start with. The
+		-- first real touch immediately corrects it to that player's real value-scaled price.
 		nameLabel.Text = ("Buy %dx %s"):format(quantity, brainrotName)
-		priceLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(config.Price * quantity))
+		priceLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(GameConfig.GetBrainrotBulkPrice(brainrotName, 0, quantity)))
 	end
 	updateNow()
 end
 
 -- Updates an already-created ShopBillboard's text AND the platform's own color in place -- used
--- by FollowsShopTier platforms, where brainrotName/price (and now affordability) depends on
--- whichever player is being shown rather than being fixed at setup time. NameLabel/PriceLabel are
--- direct children of the billboard (not a deep search), so this is cheap to call on every trigger.
-local function updateShopBillboardText(platform: BasePart, brainrotName: string, quantity: number, cash: number)
+-- by FollowsShopTier platforms, where brainrotName/price/affordability all depend on whichever
+-- player is being shown rather than being fixed at setup time -- price now also depends on that
+-- player's current GameConfig.GetTotalBrainrotValue (their whole portfolio, not just this
+-- brainrot). NameLabel/PriceLabel are direct children of the billboard (not a deep search), so
+-- this is cheap to call on every trigger.
+local function updateShopBillboardText(platform: BasePart, brainrotName: string, quantity: number, data)
 	local billboard = platform:FindFirstChild("ShopBillboard")
 	if not billboard then return end
-	local config = GameConfig.Brainrots[brainrotName]
-	if not config then return end
+	if not GameConfig.Brainrots[brainrotName] then return end
 
-	local totalPrice = config.Price * quantity
+	local totalValue = GameConfig.GetTotalBrainrotValue(data.OwnedBrainrots)
+	local totalPrice = GameConfig.GetBrainrotBulkPrice(brainrotName, totalValue, quantity)
+
 	local nameLabel = billboard:FindFirstChild("NameLabel")
 	if nameLabel then
 		nameLabel.Text = ("Buy %dx %s"):format(quantity, brainrotName)
@@ -96,7 +101,7 @@ local function updateShopBillboardText(platform: BasePart, brainrotName: string,
 	if priceLabel then
 		priceLabel.Text = ("$%s"):format(GameConfig.FormatAbbreviatedNumber(totalPrice))
 	end
-	platform.Color = (cash >= totalPrice) and AFFORD_COLOR or CANT_AFFORD_COLOR
+	platform.Color = (data.Cash >= totalPrice) and AFFORD_COLOR or CANT_AFFORD_COLOR
 end
 
 local function buyAt(platform: BasePart, player: Player, brainrotName: string, quantity: number)
@@ -116,7 +121,13 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 
 	if success then
 		local data = PlayerDataManager.Get(player)
-		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash })
+		-- TotalBrainrotValue included so the client's own shop-platform coloring (see
+		-- init.client.luau) can compute the same value-scaled price this buy just used, so its
+		-- "can I afford the next one" preview doesn't fall behind.
+		Remotes.StatsUpdate:FireClient(player, {
+			Cash = data.Cash,
+			TotalBrainrotValue = GameConfig.GetTotalBrainrotValue(data.OwnedBrainrots),
+		})
 		PlayerDataSignals.FireCashChanged(player)
 
 		-- Spending cash here can change whether the player can afford their next conversion
@@ -171,7 +182,9 @@ local function setupShopPlatform(platform: BasePart)
 			local data = PlayerDataManager.Get(player)
 			local shopTier = (data and data.ShopTier) or 1
 			local brainrotName = GameConfig.BrainrotOrder[shopTier] or GameConfig.BrainrotOrder[1]
-			updateShopBillboardText(platform, brainrotName, quantity, (data and data.Cash) or 0)
+			if data then
+				updateShopBillboardText(platform, brainrotName, quantity, data)
+			end
 			buyAt(platform, player, brainrotName, quantity)
 		end)
 		return
@@ -327,7 +340,7 @@ local function refreshFollowingShopStalls(player: Player)
 	local shopTier = data.ShopTier or 1
 	local brainrotName = GameConfig.BrainrotOrder[shopTier] or GameConfig.BrainrotOrder[1]
 	for _, entry in ipairs(followsShopTierPlatforms) do
-		updateShopBillboardText(entry.platform, brainrotName, entry.quantity, data.Cash)
+		updateShopBillboardText(entry.platform, brainrotName, entry.quantity, data)
 	end
 end
 

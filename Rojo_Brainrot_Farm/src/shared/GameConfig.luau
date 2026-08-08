@@ -5,8 +5,20 @@
 local GameConfig = {}
 
 -- ============ BRAINROT TIERS ============
--- Price keeps the x5-per-tier pattern you set for tiers 1-5; EnergyPerDrop keeps roughly the
--- same ~2.5x-per-tier curve. Just the names changed here -- values are unchanged per tier.
+-- Tiers 1-3 are untouched on purpose -- that's the pacing you said felt right. From tier 3
+-- onward, two different curves both get steeper instead of continuing tier 1-3's flat ratios:
+--
+-- EnergyPerDrop: a flat 3.2x per tier from here on (tiers 1-3 keep their original ~5x jumps).
+-- MergeRequirement copies of one tier merge into the next, so this ratio IS the merge economy:
+-- at the old ~3.6-5x-per-tier curve, merging 3 brainrots into 1 handed you a 20-67% bonus over
+-- what you fed in, and that bonus is what compounds into a runaway snowball the more you merge.
+-- At 3.2x, merging 3 gives you only ~7% more than you put in -- real but modest progress,
+-- instead of every merge multiplying your income. Since this compounds tier over tier, a small
+-- per-tier change barely moves early numbers but adds up to a huge gap by tier 8+.
+--
+-- Price: tiers 1-3 keep the flat 5x jump. From tier 3 on, the RATIO itself climbs every tier
+-- (6x, 7x, 8x, ... 17x) instead of staying flat at 5x forever -- true acceleration, so buying
+-- into a new tier gets disproportionately more expensive the further you go, not just bigger.
 --
 -- FacingOffset (optional, degrees) corrects a model whose PrimaryPart doesn't actually face
 -- the way the character visually looks -- common with imported models that weren't authored
@@ -39,96 +51,96 @@ GameConfig.Brainrots = {
 	},
 	["Trippi Troppi Troppa Trippa"] = {
 		Tier = 4,
-		Price = 625,
-		EnergyPerDrop = 90,
+		Price = 750, -- 125 x 6
+		EnergyPerDrop = 80, -- 25 x 3.2
 		DropInterval = 5,
 		MergeInto = "Cappuccino Assassino",
 		FacingOffset = 180,
 	},
 	["Cappuccino Assassino"] = {
 		Tier = 5,
-		Price = 3125,
-		EnergyPerDrop = 300,
+		Price = 5250, -- 750 x 7
+		EnergyPerDrop = 256, -- 80 x 3.2
 		DropInterval = 5,
 		MergeInto = "Chimpanzini Bananini",
 		FacingOffset = 180,
 	},
 	["Chimpanzini Bananini"] = {
 		Tier = 6,
-		Price = 15625,
-		EnergyPerDrop = 1100,
+		Price = 42000, -- 5250 x 8
+		EnergyPerDrop = 819, -- 256 x 3.2
 		DropInterval = 5,
 		MergeInto = "Bombardiro Crocodilo",
 		FacingOffset = 180,
 	},
 	["Bombardiro Crocodilo"] = {
 		Tier = 7,
-		Price = 78125,
-		EnergyPerDrop = 4000,
+		Price = 378000, -- 42000 x 9
+		EnergyPerDrop = 2621, -- 819 x 3.2
 		DropInterval = 5,
 		MergeInto = "Chimpanzini Spiderini",
 		FacingOffset = 180,
 	},
 	["Chimpanzini Spiderini"] = {
 		Tier = 8,
-		Price = 390625,
-		EnergyPerDrop = 15000,
+		Price = 3780000, -- 378000 x 10
+		EnergyPerDrop = 8387, -- 2621 x 3.2
 		DropInterval = 5,
 		MergeInto = "Tralalero Tralala",
 		FacingOffset = 180,
 	},
 	["Tralalero Tralala"] = {
 		Tier = 9,
-		Price = 1953125,
-		EnergyPerDrop = 60000,
+		Price = 41580000, -- 3780000 x 11
+		EnergyPerDrop = 26838, -- 8387 x 3.2
 		DropInterval = 5,
 		MergeInto = "Tung Tung Tung Sahur",
 		FacingOffset = 180,
 	},
 	["Tung Tung Tung Sahur"] = {
 		Tier = 10,
-		Price = 9765625,
-		EnergyPerDrop = 235000,
+		Price = 498960000, -- 41580000 x 12
+		EnergyPerDrop = 85882, -- 26838 x 3.2
 		DropInterval = 5,
 		MergeInto = "67",
 		FacingOffset = 180,
 	},
 	["67"] = {
 		Tier = 11,
-		Price = 48828125,
-		EnergyPerDrop = 900000,
+		Price = 6486480000, -- 498960000 x 13
+		EnergyPerDrop = 274822, -- 85882 x 3.2
 		DropInterval = 5,
 		MergeInto = "Dragon Cannelloni",
 		FacingOffset = 180,
 	},
 	["Dragon Cannelloni"] = {
 		Tier = 12,
-		Price = 244140625,
-		EnergyPerDrop = 4000000,
+		Price = 90810720000, -- 6486480000 x 14
+		EnergyPerDrop = 879430, -- 274822 x 3.2
 		DropInterval = 5,
 		MergeInto = "Garama and Madundung",
 		FacingOffset = 180,
 	},
 	["Garama and Madundung"] = {
 		Tier = 13,
-		Price = 1220703125,
-		EnergyPerDrop = 15000000,
+		Price = 1362160800000, -- 90810720000 x 15
+		EnergyPerDrop = 2814176, -- 879430 x 3.2
 		DropInterval = 5,
 		MergeInto = "Strawberry Elephant",
 		FacingOffset = 180,
 	},
 	["Strawberry Elephant"] = {
 		Tier = 14,
-		Price = 6103515625,
-		EnergyPerDrop = 55000000,
+		Price = 21794572800000, -- 1362160800000 x 16
+		EnergyPerDrop = 9005363, -- 2814176 x 3.2
 		DropInterval = 5,
 		MergeInto = "La Grande Combinasion",
 		FacingOffset = 180,
 	},
 	["La Grande Combinasion"] = {
 		Tier = 15,
-		Price = 30517578125,
-		EnergyPerDrop = 225000000,
+		Price = 370507737600000, -- 21794572800000 x 17
+		EnergyPerDrop = 28817162, -- 9005363 x 3.2
 		DropInterval = 5,
 		MergeInto = nil, -- max tier for now
 		FacingOffset = 180,
@@ -153,16 +165,73 @@ end
 -- How many of the same tier are needed to merge into the next tier
 GameConfig.MergeRequirement = 3
 
+-- ============ NET WORTH-SCALED PRICING ============
+-- "Total brainrot value": each owned brainrot is worth 3^(Tier-1) -- tier 1 = 1, tier 2 = 3,
+-- tier 3 = 9, and so on. That exponent isn't arbitrary: MergeRequirement (3) copies of one tier
+-- always merge into exactly 1 of the next, and 3 x 3^(N-1) = 3^N -- so merging can NEVER change
+-- this total, only buying more brainrots can. It's a clean read on "how powerful is this player
+-- right now" that isn't gamed by however many times they've merged.
+--
+-- Both brainrot prices and the conversion-rate upgrade cost scale off this value through a
+-- shared multiplier -- the more of a portfolio a player has already built, the more everything
+-- costs from here, regardless of which tier or strategy they leaned on to get there. A single
+-- snapshot taken once per purchase (not recalculated per-unit inside one bulk buy), so buying
+-- x100 at once doesn't spiral the way per-unit purchase-count pricing did.
+function GameConfig.GetTotalBrainrotValue(ownedBrainrots: { { Name: string, Id: string } }): number
+	local total = 0
+	for _, entry in ipairs(ownedBrainrots) do
+		local config = GameConfig.Brainrots[entry.Name]
+		if config then
+			total += 3 ^ (config.Tier - 1)
+		end
+	end
+	return total
+end
+
+-- Multiplier = 1 + Rate * totalValue -- LINEAR in totalValue, not a power curve. A power curve
+-- (anything ^ Exponent < 1) keeps getting flatter forever, so eventually one more purchase adds
+-- less than $1 and the rounded price repeats itself -- not a tuning issue, just what that shape
+-- of curve inevitably does once totalValue gets big enough. Linear keeps a CONSTANT per-purchase
+-- increment instead of a shrinking one, so at Rate = 0.288 that increment for tier 1 (base $5) is
+-- 5 x 0.288 = $1.44 -- always over $1, which mathematically guarantees two consecutive purchases
+-- can never round to the same price. Buying tier 1 repeatedly: $5, $7, $9, $10, $12, $13, $15...
+-- Only affects brainrot pricing -- GetUpgradeCost (rate-per-second) deliberately does NOT use
+-- this, so the two stay independent even though they share this same underlying reading.
+GameConfig.ValueScaling = {
+	Rate = 0.288,
+}
+
+function GameConfig.GetValueScaledMultiplier(totalValue: number): number
+	return 1 + GameConfig.ValueScaling.Rate * totalValue
+end
+
+-- Price of ONE unit of `brainrotName` right now, given the player's current total brainrot value.
+function GameConfig.GetBrainrotUnitPrice(brainrotName: string, totalValue: number): number
+	local config = GameConfig.Brainrots[brainrotName]
+	if not config then return 0 end
+	local price = config.Price * GameConfig.GetValueScaledMultiplier(totalValue)
+	return math.floor(price + 0.5)
+end
+
+-- Total cost of buying `quantity` units in one go, all at the SAME per-unit price (today's
+-- value-scaled price, taken once) -- not escalating unit-by-unit within the purchase, so x100
+-- stays a predictable "100x the current price" rather than compounding mid-transaction.
+function GameConfig.GetBrainrotBulkPrice(brainrotName: string, totalValue: number, quantity: number): number
+	return GameConfig.GetBrainrotUnitPrice(brainrotName, totalValue) * quantity
+end
+
 -- ============ SHOP TIER PROGRESSION ============
 -- Which brainrot the FollowsShopTier-tagged shop platforms (x1/x5/x25/x100) actually sell is a
 -- per-player unlock (data.ShopTier, starts at 1 -- see PlayerDataManager) rather than fixed --
 -- pay at the ShopTierUpgradePlatform to raise it by one, up to #BrainrotOrder. The cost of
--- unlocking the NEXT tier is pegged directly to that tier's own Price above (rather than a
--- separate hand-tuned curve), so it automatically follows however Brainrots' Price column gets
--- tuned instead of drifting out of sync with it -- unlocking costs roughly what buying a full
--- x100 at your CURRENT tier would.
+-- unlocking the NEXT tier is pegged directly to that tier's own Price above (a flat constant
+-- multiplier, not its own separate growing curve) so it automatically follows however Brainrots'
+-- Price column gets tuned instead of drifting out of sync with it -- and since Price above now
+-- accelerates from tier 3 onward, this cost inherits that same acceleration for free. The
+-- multiplier itself was also raised (100 -> 300) to make unlocking a real, deliberate sink on
+-- top of that, not just along for the ride.
 GameConfig.ShopTierUpgrade = {
-	PriceMultiplier = 100,
+	PriceMultiplier = 300,
 }
 
 function GameConfig.GetShopTierUpgradeCost(currentTier: number): number
@@ -179,12 +248,22 @@ GameConfig.BaseConversionRate = 1
 GameConfig.ConversionUpgrade = {
 	-- No MaxLevel -- upgrades are purchasable indefinitely, the cost/rate formulas below already
 	-- generalize to any level with no cap baked in.
+	--
+	-- CostGrowth used to equal RateGrowth (both 1.4) -- meaning cost-per-unit-of-rate stayed
+	-- EXACTLY constant no matter how many levels you bought. The numbers looked exponential but
+	-- upgrading never actually got any less efficient, which is a big part of why progress felt
+	-- linear/unthrottled. Raising CostGrowth above RateGrowth makes each successive purchase
+	-- genuinely less cost-effective than the last -- real diminishing returns, not just bigger
+	-- numbers on both sides of the same ratio.
 	BaseCost = 1,
-	CostGrowth = 1.4,     -- each purchase costs 1.4x the previous one
+	CostGrowth = 1.6,     -- each purchase costs 1.6x the previous one
 	RatePerLevel = 0.75,  -- how much the FIRST purchase adds to your rate
-	RateGrowth = 1.4,     -- each purchase's rate increase is 1.4x the previous purchase's increase
+	RateGrowth = 1.25,    -- each purchase's rate increase is 1.25x the previous purchase's increase (was 1.4 -- the granted rate itself was compounding too fast, independent of cost)
 }
 
+-- Deliberately independent of GetTotalBrainrotValue (unlike brainrot pricing above) -- this
+-- still gets more expensive as you buy more of it (CostGrowth^currentLevel), just not also
+-- taxed by how big your brainrot portfolio is.
 function GameConfig.GetUpgradeCost(currentLevel: number): number
 	return math.floor(GameConfig.ConversionUpgrade.BaseCost * (GameConfig.ConversionUpgrade.CostGrowth ^ currentLevel))
 end

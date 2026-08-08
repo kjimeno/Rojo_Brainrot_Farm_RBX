@@ -15,6 +15,7 @@ local PlayerGui = player:WaitForChild("PlayerGui")
 
 local cash = 0
 local shopTier = 1
+local totalBrainrotValue = 0 -- this player's current GameConfig.GetTotalBrainrotValue -- see GameConfig.GetBrainrotBulkPrice
 
 -- ===== Background music: just track 1, looping =====
 local musicSound = Instance.new("Sound")
@@ -40,9 +41,8 @@ local trackedShopPlatforms = {}
 
 local function getShopPlatformTotalPrice(entry): number?
 	local brainrotName = entry.brainrotName or GameConfig.BrainrotOrder[shopTier] or GameConfig.BrainrotOrder[1]
-	local config = GameConfig.Brainrots[brainrotName]
-	if not config then return nil end
-	return config.Price * entry.quantity
+	if not GameConfig.Brainrots[brainrotName] then return nil end
+	return GameConfig.GetBrainrotBulkPrice(brainrotName, totalBrainrotValue, entry.quantity)
 end
 
 local function colorShopPlatform(platform: BasePart, entry)
@@ -561,6 +561,11 @@ Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 
 	if stats.ShopTier ~= nil then
 		shopTier = stats.ShopTier
+		refreshAllShopPlatforms()
+	end
+
+	if stats.TotalBrainrotValue ~= nil then
+		totalBrainrotValue = stats.TotalBrainrotValue
 		refreshAllShopPlatforms()
 	end
 
