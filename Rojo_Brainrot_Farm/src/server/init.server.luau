@@ -52,8 +52,17 @@ local function releasePlot(player: Player)
 	end
 end
 
+-- Default Roblox WalkSpeed is 16 -- a bit faster for getting around the shop/plot quicker.
+-- Re-applied on every CharacterAdded since respawning gives the player a brand-new Humanoid.
+local WALK_SPEED = 20
+
 -- Load data as soon as a player joins, save + release when they leave.
 Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(character)
+		local humanoid = character:WaitForChild("Humanoid")
+		humanoid.WalkSpeed = WALK_SPEED
+	end)
+
 	PlayerDataManager.Load(player)
 
 	local plot = assignPlot(player)
