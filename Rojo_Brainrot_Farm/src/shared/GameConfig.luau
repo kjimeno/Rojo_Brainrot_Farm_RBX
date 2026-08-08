@@ -5,20 +5,12 @@
 local GameConfig = {}
 
 -- ============ BRAINROT TIERS ============
--- Tiers 1-3 are untouched on purpose -- that's the pacing you said felt right. From tier 3
--- onward, two different curves both get steeper instead of continuing tier 1-3's flat ratios:
---
--- EnergyPerDrop: a flat 3.2x per tier from here on (tiers 1-3 keep their original ~5x jumps).
--- MergeRequirement copies of one tier merge into the next, so this ratio IS the merge economy:
--- at the old ~3.6-5x-per-tier curve, merging 3 brainrots into 1 handed you a 20-67% bonus over
--- what you fed in, and that bonus is what compounds into a runaway snowball the more you merge.
--- At 3.2x, merging 3 gives you only ~7% more than you put in -- real but modest progress,
--- instead of every merge multiplying your income. Since this compounds tier over tier, a small
--- per-tier change barely moves early numbers but adds up to a huge gap by tier 8+.
---
--- Price: tiers 1-3 keep the flat 5x jump. From tier 3 on, the RATIO itself climbs every tier
--- (6x, 7x, 8x, ... 17x) instead of staying flat at 5x forever -- true acceleration, so buying
--- into a new tier gets disproportionately more expensive the further you go, not just bigger.
+-- EnergyPerDrop is back to its original per-tier values (not a flat ratio anymore -- merging 3
+-- copies of a tier now gives more than a modest bump again, same as before this session's
+-- rebalancing pass touched it). Price is untouched from the rebalance: tiers 1-3 keep the flat
+-- 5x jump, tier 3 onward the RATIO itself climbs every tier (6x, 7x, 8x, ... 17x) instead of
+-- staying flat at 5x forever -- true acceleration, so buying into a new tier gets
+-- disproportionately more expensive the further you go, not just bigger.
 --
 -- FacingOffset (optional, degrees) corrects a model whose PrimaryPart doesn't actually face
 -- the way the character visually looks -- common with imported models that weren't authored
@@ -52,7 +44,7 @@ GameConfig.Brainrots = {
 	["Trippi Troppi Troppa Trippa"] = {
 		Tier = 4,
 		Price = 750, -- 125 x 6
-		EnergyPerDrop = 80, -- 25 x 3.2
+		EnergyPerDrop = 90,
 		DropInterval = 5,
 		MergeInto = "Cappuccino Assassino",
 		FacingOffset = 180,
@@ -60,7 +52,7 @@ GameConfig.Brainrots = {
 	["Cappuccino Assassino"] = {
 		Tier = 5,
 		Price = 5250, -- 750 x 7
-		EnergyPerDrop = 256, -- 80 x 3.2
+		EnergyPerDrop = 300,
 		DropInterval = 5,
 		MergeInto = "Chimpanzini Bananini",
 		FacingOffset = 180,
@@ -68,7 +60,7 @@ GameConfig.Brainrots = {
 	["Chimpanzini Bananini"] = {
 		Tier = 6,
 		Price = 42000, -- 5250 x 8
-		EnergyPerDrop = 819, -- 256 x 3.2
+		EnergyPerDrop = 1100,
 		DropInterval = 5,
 		MergeInto = "Bombardiro Crocodilo",
 		FacingOffset = 180,
@@ -76,7 +68,7 @@ GameConfig.Brainrots = {
 	["Bombardiro Crocodilo"] = {
 		Tier = 7,
 		Price = 378000, -- 42000 x 9
-		EnergyPerDrop = 2621, -- 819 x 3.2
+		EnergyPerDrop = 4000,
 		DropInterval = 5,
 		MergeInto = "Chimpanzini Spiderini",
 		FacingOffset = 180,
@@ -84,7 +76,7 @@ GameConfig.Brainrots = {
 	["Chimpanzini Spiderini"] = {
 		Tier = 8,
 		Price = 3780000, -- 378000 x 10
-		EnergyPerDrop = 8387, -- 2621 x 3.2
+		EnergyPerDrop = 15000,
 		DropInterval = 5,
 		MergeInto = "Tralalero Tralala",
 		FacingOffset = 180,
@@ -92,7 +84,7 @@ GameConfig.Brainrots = {
 	["Tralalero Tralala"] = {
 		Tier = 9,
 		Price = 41580000, -- 3780000 x 11
-		EnergyPerDrop = 26838, -- 8387 x 3.2
+		EnergyPerDrop = 60000,
 		DropInterval = 5,
 		MergeInto = "Tung Tung Tung Sahur",
 		FacingOffset = 180,
@@ -100,7 +92,7 @@ GameConfig.Brainrots = {
 	["Tung Tung Tung Sahur"] = {
 		Tier = 10,
 		Price = 498960000, -- 41580000 x 12
-		EnergyPerDrop = 85882, -- 26838 x 3.2
+		EnergyPerDrop = 235000,
 		DropInterval = 5,
 		MergeInto = "67",
 		FacingOffset = 180,
@@ -108,7 +100,7 @@ GameConfig.Brainrots = {
 	["67"] = {
 		Tier = 11,
 		Price = 6486480000, -- 498960000 x 13
-		EnergyPerDrop = 274822, -- 85882 x 3.2
+		EnergyPerDrop = 900000,
 		DropInterval = 5,
 		MergeInto = "Dragon Cannelloni",
 		FacingOffset = 180,
@@ -116,7 +108,7 @@ GameConfig.Brainrots = {
 	["Dragon Cannelloni"] = {
 		Tier = 12,
 		Price = 90810720000, -- 6486480000 x 14
-		EnergyPerDrop = 879430, -- 274822 x 3.2
+		EnergyPerDrop = 4000000,
 		DropInterval = 5,
 		MergeInto = "Garama and Madundung",
 		FacingOffset = 180,
@@ -124,7 +116,7 @@ GameConfig.Brainrots = {
 	["Garama and Madundung"] = {
 		Tier = 13,
 		Price = 1362160800000, -- 90810720000 x 15
-		EnergyPerDrop = 2814176, -- 879430 x 3.2
+		EnergyPerDrop = 15000000,
 		DropInterval = 5,
 		MergeInto = "Strawberry Elephant",
 		FacingOffset = 180,
@@ -132,7 +124,7 @@ GameConfig.Brainrots = {
 	["Strawberry Elephant"] = {
 		Tier = 14,
 		Price = 21794572800000, -- 1362160800000 x 16
-		EnergyPerDrop = 9005363, -- 2814176 x 3.2
+		EnergyPerDrop = 55000000,
 		DropInterval = 5,
 		MergeInto = "La Grande Combinasion",
 		FacingOffset = 180,
@@ -140,7 +132,7 @@ GameConfig.Brainrots = {
 	["La Grande Combinasion"] = {
 		Tier = 15,
 		Price = 370507737600000, -- 21794572800000 x 17
-		EnergyPerDrop = 28817162, -- 9005363 x 3.2
+		EnergyPerDrop = 225000000,
 		DropInterval = 5,
 		MergeInto = nil, -- max tier for now
 		FacingOffset = 180,

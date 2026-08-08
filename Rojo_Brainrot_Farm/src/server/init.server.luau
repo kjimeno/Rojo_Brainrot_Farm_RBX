@@ -53,14 +53,21 @@ local function releasePlot(player: Player)
 end
 
 -- Default Roblox WalkSpeed is 16 -- a bit faster for getting around the shop/plot quicker.
--- Re-applied on every CharacterAdded since respawning gives the player a brand-new Humanoid.
 local WALK_SPEED = 20
 
--- Load data as soon as a player joins, save + release when they leave.
+-- MaxSlopeAngle defaults to 89 -- Roblox humanoids can auto climb almost any incline or ledge
+-- edge (stand platforms, conveyor lips, etc.) without jumping. Dropping it low stops that
+-- auto-climb while still leaving normal flat-ground walking untouched.
+local MAX_SLOPE_ANGLE = 10
+
+-- Re-applied on every CharacterAdded, since respawning gives the player a brand-new Humanoid
+-- that resets to Roblox's defaults. Jump stays untouched -- only auto-climb is disabled.
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(function(character)
 		local humanoid = character:WaitForChild("Humanoid")
 		humanoid.WalkSpeed = WALK_SPEED
+		humanoid.MaxSlopeAngle = MAX_SLOPE_ANGLE
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
 	end)
 
 	PlayerDataManager.Load(player)

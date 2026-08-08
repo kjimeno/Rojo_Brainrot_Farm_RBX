@@ -6,12 +6,18 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
+local StarterGui = game:GetService("StarterGui")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 
 local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- LandscapeSensor lets the game auto-rotate between landscape-left/landscape-right as the
+-- device physically turns, but excludes portrait entirely -- set as early as possible (before
+-- any UI below builds out) so there's no brief portrait flash on mobile at startup.
+StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
 
 local cash = 0
 local shopTier = 1
