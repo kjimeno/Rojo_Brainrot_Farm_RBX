@@ -228,10 +228,10 @@ end
 -- multiplier, not its own separate growing curve) so it automatically follows however Brainrots'
 -- Price column gets tuned instead of drifting out of sync with it -- and since Price above now
 -- accelerates from tier 3 onward, this cost inherits that same acceleration for free. The
--- multiplier itself was also raised (100 -> 300) to make unlocking a real, deliberate sink on
--- top of that, not just along for the ride.
+-- multiplier itself was also raised (100 -> 300 -> 2100, this last one a straight 7x) to make
+-- unlocking a real, deliberate sink on top of that, not just along for the ride.
 GameConfig.ShopTierUpgrade = {
-	PriceMultiplier = 300,
+	PriceMultiplier = 2000,
 }
 
 function GameConfig.GetShopTierUpgradeCost(currentTier: number): number
