@@ -5,10 +5,22 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PlayerDataManager = require(script.PlayerDataManager)
+
+-- The client script also sets ResetOnSpawn=false on the live PlayerGui.Main clone, but that
+-- alone wasn't preventing the reset -- Roblox's respawn logic likely reads the STARTERGUI
+-- TEMPLATE's own ResetOnSpawn (still true, its default, since only the runtime clone had been
+-- touched) to decide whether to tear a player's copy down and reclone it, not the live clone's
+-- current value. Setting it here, on the template itself, before any player can possibly join
+-- or spawn a character.
+local mainGui = StarterGui:FindFirstChild("Main")
+if mainGui then
+	mainGui.ResetOnSpawn = false
+end
 
 -- Requiring these modules runs their top-level code, which wires up all the
 -- RemoteEvent listeners and Touched connections. Order matters: BrainrotSpawner
@@ -62,12 +74,18 @@ local MAX_SLOPE_ANGLE = 10
 
 -- Re-applied on every CharacterAdded, since respawning gives the player a brand-new Humanoid
 -- that resets to Roblox's defaults. Jump stays untouched -- only auto-climb is disabled.
+--
+-- HealthDisplayType defaults to DisplayWhenDamaged -- Roblox shows the floating health bar
+-- above your head any time health is below max, INCLUDING at 0 (dead), which is the empty bar
+-- you don't want showing. AlwaysOff removes that display entirely -- there's no combat/damage
+-- mechanic in this game, so there's nothing worth showing a health bar for anyway.
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(function(character)
 		local humanoid = character:WaitForChild("Humanoid")
 		humanoid.WalkSpeed = WALK_SPEED
 		humanoid.MaxSlopeAngle = MAX_SLOPE_ANGLE
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+		humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 	end)
 
 	PlayerDataManager.Load(player)

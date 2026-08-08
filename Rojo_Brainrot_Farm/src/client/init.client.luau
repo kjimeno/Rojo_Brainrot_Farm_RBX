@@ -22,6 +22,12 @@ local PlayerGui = player:WaitForChild("PlayerGui")
 -- PlayerGui.ScreenOrientation directly is what Roblox's own docs describe for enforcing this
 -- during actual gameplay rather than just as a future default.
 StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
+
+-- Enum.CoreGuiType.Health is Roblox's built-in SCREEN HUD health bar (with red damage flashes) --
+-- a separate system from Humanoid.HealthDisplayType, which only controls the floating billboard
+-- above a character's head. This is the one that shows up full-screen on death/falling into the
+-- killzone. Must be set from a LocalScript (SetCoreGuiEnabled is client-only).
+StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 PlayerGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
 
 local cash = 0
@@ -330,6 +336,12 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 end
 
 local Main = PlayerGui:WaitForChild("Main")
+-- ScreenGui.ResetOnSpawn defaults to true -- Roblox destroys and recreates the ENTIRE GUI fresh
+-- from StarterGui every time the character respawns. That silently swaps the live, StatsUpdate-
+-- wired HUD for a brand-new untouched copy -- every script reference above (Main, and everything
+-- under it) keeps pointing at the old, now-invisible instance, while the new visible one just
+-- shows whatever static placeholder text was set in Studio and never updates again.
+Main.ResetOnSpawn = false
 createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true, "list")
 createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy", false, "floating")
 
