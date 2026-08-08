@@ -15,9 +15,14 @@ local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 
 -- LandscapeSensor lets the game auto-rotate between landscape-left/landscape-right as the
--- device physically turns, but excludes portrait entirely -- set as early as possible (before
--- any UI below builds out) so there's no brief portrait flash on mobile at startup.
+-- device physically turns, but excludes portrait entirely. Set on BOTH StarterGui (the default
+-- future PlayerGuis inherit) AND this player's own already-created PlayerGui directly -- the
+-- StarterGui-only version wasn't reliably applying to the CURRENT session's live PlayerGui,
+-- since by the time this LocalScript runs, PlayerGui typically already exists. Setting
+-- PlayerGui.ScreenOrientation directly is what Roblox's own docs describe for enforcing this
+-- during actual gameplay rather than just as a future default.
 StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
+PlayerGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
 
 local cash = 0
 local shopTier = 1

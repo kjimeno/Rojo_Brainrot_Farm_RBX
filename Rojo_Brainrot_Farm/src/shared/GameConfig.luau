@@ -184,13 +184,13 @@ end
 -- (anything ^ Exponent < 1) keeps getting flatter forever, so eventually one more purchase adds
 -- less than $1 and the rounded price repeats itself -- not a tuning issue, just what that shape
 -- of curve inevitably does once totalValue gets big enough. Linear keeps a CONSTANT per-purchase
--- increment instead of a shrinking one, so at Rate = 0.288 that increment for tier 1 (base $5) is
--- 5 x 0.288 = $1.44 -- always over $1, which mathematically guarantees two consecutive purchases
--- can never round to the same price. Buying tier 1 repeatedly: $5, $7, $9, $10, $12, $13, $15...
+-- increment instead of a shrinking one, so at Rate = 0.27 that increment for tier 1 (base $5) is
+-- 5 x 0.27 = $1.35 -- always over $1, which mathematically guarantees two consecutive purchases
+-- can never round to the same price. Buying tier 1 repeatedly: $5, $6, $8, $9, $10, $12, $13...
 -- Only affects brainrot pricing -- GetUpgradeCost (rate-per-second) deliberately does NOT use
 -- this, so the two stay independent even though they share this same underlying reading.
 GameConfig.ValueScaling = {
-	Rate = 0.288,
+	Rate = 0.240,
 }
 
 function GameConfig.GetValueScaledMultiplier(totalValue: number): number
