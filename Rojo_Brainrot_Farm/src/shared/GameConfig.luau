@@ -338,15 +338,15 @@ function GameConfig.FormatAbbreviatedNumber(amount: number): string
 	return (isNegative and "-" or "") .. reversed:reverse()
 end
 
--- Same abbreviation above 100,000 as FormatAbbreviatedNumber (both always show 2 decimals
--- there now), but for per-second RATES rather than lump sums -- rates are meaningfully
--- fractional BELOW that threshold too (e.g. "1.75"), so this keeps 2 decimals down there as
--- well instead of falling back to comma-formatted whole numbers.
+-- Same abbreviation above 100,000 as FormatAbbreviatedNumber, but for per-second RATES rather
+-- than lump sums. No decimals below that threshold either -- GetNextRateIncrease/
+-- GetConversionRate both already round to whole numbers, so a rate is never actually fractional
+-- anymore; showing "12.00" instead of "12" would just be padding with meaningless zeros.
 function GameConfig.FormatAbbreviatedRate(amount: number): string
 	if math.abs(amount) >= 1e5 then
 		return GameConfig.FormatAbbreviatedNumber(amount)
 	end
-	return ("%.2f"):format(amount)
+	return tostring(math.floor(amount + 0.5))
 end
 
 return GameConfig
