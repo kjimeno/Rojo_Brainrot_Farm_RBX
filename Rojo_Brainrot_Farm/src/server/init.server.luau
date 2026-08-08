@@ -64,7 +64,7 @@ Players.PlayerAdded:Connect(function(player)
 			-- without this, a returning player's saved brainrots never appear until some other
 			-- action (buying, merging) happens to trigger a repack as a side effect.
 			BrainrotSpawner.RepackPlot(player, plot, data)
-			EnergyConversionSystem.UpdateBoard(plot, data)
+			EnergyConversionSystem.UpdateBoard(plot, data, player)
 			MergeSystem.UpdateMergePlatform(plot, data)
 		end
 	end
@@ -113,7 +113,7 @@ Remotes.RequestStats.OnServerEvent:Connect(function(player)
 
 	local plot = EnergyConversionSystem.GetPlayerPlot(player)
 	if plot then
-		EnergyConversionSystem.UpdateBoard(plot, data)
+		EnergyConversionSystem.UpdateBoard(plot, data, player)
 		MergeSystem.UpdateMergePlatform(plot, data)
 	end
 	ShopPrompts.RefreshShopTierUpgradeDisplay(player)

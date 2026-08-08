@@ -257,8 +257,13 @@ GameConfig.ConversionUpgrade = {
 	CostBase = 0.0886,
 	CostOffset = 4.187,
 	CostExponent = 3.3,
-	RatePerLevel = 0.75,  -- how much the FIRST purchase adds to your rate
-	RateGrowth = 1.25,    -- each purchase's rate increase is 1.25x the previous purchase's increase (was 1.4 -- the granted rate itself was compounding too fast, independent of cost)
+
+	-- The rate GRANTED per purchase is also a power curve, same shape as cost above but its own
+	-- separate fit -- rateIncrease(level) = RateBase * (level + RateOffset) ^ RateExponent.
+	-- Fit to hit level 0 = +2/sec and level 22 = +159/sec, tracking closely in between.
+	RateBase = 0.04336,
+	RateOffset = 4.627,
+	RateExponent = 2.5,
 }
 
 -- Deliberately independent of GetTotalBrainrotValue (unlike brainrot pricing above) -- this
@@ -270,20 +275,24 @@ function GameConfig.GetUpgradeCost(currentLevel: number): number
 	return math.floor(cost + 0.5)
 end
 
--- How much rate your NEXT purchase (going from currentLevel to currentLevel + 1) adds --
--- itself growing by RateGrowth each time, not a flat amount.
+-- How much rate your NEXT purchase (going from currentLevel to currentLevel + 1) adds.
 function GameConfig.GetNextRateIncrease(currentLevel: number): number
-	return GameConfig.ConversionUpgrade.RatePerLevel * (GameConfig.ConversionUpgrade.RateGrowth ^ currentLevel)
+	local upgrade = GameConfig.ConversionUpgrade
+	local increase = upgrade.RateBase * ((currentLevel + upgrade.RateOffset) ^ upgrade.RateExponent)
+	return math.floor(increase + 0.5)
 end
 
--- Sum of every purchase's increase so far (a geometric series), plus the base rate.
+-- Sum of every purchase's increase so far, plus the base rate. No closed-form sum exists for a
+-- non-integer-exponent power series (unlike the old constant-ratio/geometric version), so this
+-- adds them up in a loop instead -- fine because callers cache the result and only call this
+-- again when ConversionLevel actually changes (see EnergyConversionSystem's rate cache), not on
+-- every conversion tick.
 function GameConfig.GetConversionRate(level: number): number
-	local upgrade = GameConfig.ConversionUpgrade
-	if level <= 0 then
-		return GameConfig.BaseConversionRate
+	local total = GameConfig.BaseConversionRate
+	for i = 0, level - 1 do
+		total += GameConfig.GetNextRateIncrease(i)
 	end
-	local totalIncrease = upgrade.RatePerLevel * (upgrade.RateGrowth ^ level - 1) / (upgrade.RateGrowth - 1)
-	return GameConfig.BaseConversionRate + totalIncrease
+	return total
 end
 
 -- ============ PLOT / CONVEYOR ============

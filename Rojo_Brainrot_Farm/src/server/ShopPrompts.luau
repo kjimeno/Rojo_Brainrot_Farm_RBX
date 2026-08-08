@@ -135,7 +135,7 @@ local function buyAt(platform: BasePart, player: Player, brainrotName: string, q
 		-- refresh both of those signs too.
 		local plot = EnergyConversionSystem.GetPlayerPlot(player)
 		if plot then
-			EnergyConversionSystem.UpdateBoard(plot, data)
+			EnergyConversionSystem.UpdateBoard(plot, data, player)
 			MergeSystem.UpdateMergePlatform(plot, data)
 		end
 

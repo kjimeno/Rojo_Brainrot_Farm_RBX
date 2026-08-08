@@ -17,6 +17,30 @@ local AFFORD_COLOR = Color3.fromRGB(73, 201, 105)
 local CANT_AFFORD_COLOR = Color3.fromRGB(255, 99, 47)
 local CASH_COLOR = Color3.fromRGB(60, 200, 100)
 
+-- GameConfig.GetConversionRate sums a non-integer-exponent power series in a loop (no closed
+-- form exists for one) -- fine for an occasional call, but updateBoard and the conversion tick
+-- below both call this on hot paths (the tick runs 10x/second for EVERY player), and re-summing
+-- from scratch that often is exactly the kind of per-trigger cost that caused the "x100
+-- inconsistent" lag earlier this session. ConversionLevel only actually changes when a player
+-- buys an upgrade (rare), so this caches the result and only recomputes on that specific event.
+local conversionRateCache = {} -- [player] = last-computed GameConfig.GetConversionRate(data.ConversionLevel)
+
+local function getCachedConversionRate(player: Player, data): number
+	local cached = conversionRateCache[player]
+	if cached then return cached end
+	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
+	conversionRateCache[player] = rate
+	return rate
+end
+
+local function invalidateConversionRateCache(player: Player, data)
+	conversionRateCache[player] = GameConfig.GetConversionRate(data.ConversionLevel)
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	conversionRateCache[player] = nil
+end)
+
 -- Own rig, separate from the merge platform's HitEffect: ServerStorage/"Particle effects"/
 -- DepositEffect. Same "clone ONCE up front, then just :Emit() the existing copy" pattern as
 -- MergeSystem.luau's HitEffect -- see that file for why (a same-frame Clone()+Emit() can
@@ -138,11 +162,11 @@ end
 -- Refreshes the physical SurfaceGui board on the player's plot to reflect current silo/rate
 -- numbers, plus the coin vault and upgrade platform billboards. Only .Text/.Color are ever
 -- touched -- style each label however you want in Studio and it'll stick.
-local function updateBoard(plot: Instance, data)
+local function updateBoard(plot: Instance, data, player: Player)
 	local refs = getBoardRefs(plot)
 	if not refs then return end
 
-	local rate = GameConfig.GetConversionRate(data.ConversionLevel)
+	local rate = getCachedConversionRate(player, data)
 
 	if refs.TitleLabel then
 		refs.TitleLabel.Text = (data.SiloEnergy > 0) and "Converting Energy" or "No Energy"
@@ -231,7 +255,7 @@ local function ensureUpgradeBillboard(platform: Instance)
 	rateLabel.Font = Enum.Font.GothamBold
 	rateLabel.TextScaled = true
 	rateLabel.TextColor3 = Color3.new(1, 1, 1)
-	rateLabel.Text = ("+%s per second"):format(GameConfig.FormatAbbreviatedRate(GameConfig.ConversionUpgrade.RatePerLevel))
+	rateLabel.Text = ("+%s per second"):format(GameConfig.FormatAbbreviatedRate(GameConfig.GetNextRateIncrease(0)))
 	rateLabel.Parent = billboard
 
 	local costLabel = Instance.new("TextLabel")
@@ -258,6 +282,7 @@ local function tryUpgradeConversion(player: Player): (boolean, number | string)
 
 	data.Cash -= cost
 	data.ConversionLevel += 1
+	invalidateConversionRateCache(player, data)
 	return true, data.ConversionLevel
 end
 
@@ -284,17 +309,17 @@ local function setupDepositArea(plot: Instance)
 			SiloEnergy = data.SiloEnergy,
 			DepositedAmount = depositedAmount,
 		})
-		updateBoard(plot, data)
+		updateBoard(plot, data, player)
 	end)
 end
 
 -- ===== 3. Converting silo energy -> pending cash over time (1 energy = 1 cash) =====
 -- Ticks much faster than once per second so the "$X to collect" sign climbs in small,
 -- frequent steps instead of one visible jump per second -- feels closer to real-time.
--- GetConversionRate can be fractional (RateGrowth compounds per upgrade), and now each tick
--- only covers a fraction of a second's worth of the rate too, so a per-player leftover
--- accumulator carries fractional progress between ticks -- PendingCash/SiloEnergy still only
--- ever change by whole numbers, the fractional part never leaks into what's displayed.
+-- GetConversionRate can be fractional, and now each tick only covers a fraction of a second's
+-- worth of the rate too, so a per-player leftover accumulator carries fractional progress
+-- between ticks -- PendingCash/SiloEnergy still only ever change by whole numbers, the
+-- fractional part never leaks into what's displayed.
 local CONVERSION_TICK_INTERVAL = 0.1
 local conversionRemainders = {} -- [player] = leftover fractional energy not yet converted
 
@@ -309,7 +334,7 @@ local function startConversionLoop()
 			for _, player in ipairs(Players:GetPlayers()) do
 				local data = PlayerDataManager.Get(player)
 				if data and data.SiloEnergy > 0 then
-					local rate = GameConfig.GetConversionRate(data.ConversionLevel)
+					local rate = getCachedConversionRate(player, data)
 					local remainder = (conversionRemainders[player] or 0) + (rate * CONVERSION_TICK_INTERVAL)
 
 					-- Capped at SiloEnergy too, in case the silo runs dry mid-tick -- any
@@ -323,7 +348,7 @@ local function startConversionLoop()
 
 						local plot = getPlayerPlot(player)
 						if plot then
-							updateBoard(plot, data)
+							updateBoard(plot, data, player)
 						end
 					end
 				end
@@ -351,7 +376,7 @@ local function setupCoinVault(plot: Instance)
 		-- the client uses it to trigger the "coins pop out of the vault and fly back to you"
 		-- effect, only on the specific update where an actual vault collection just happened.
 		Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash, PendingCash = 0, VaultCollectedAmount = collectedAmount })
-		updateBoard(plot, data)
+		updateBoard(plot, data, player)
 		PlayerDataSignals.FireCashChanged(player)
 	end)
 end
@@ -364,7 +389,7 @@ Remotes.UpgradeConversion.OnServerEvent:Connect(function(player)
 	if success then
 		local plot = getPlayerPlot(player)
 		if plot then
-			updateBoard(plot, PlayerDataManager.Get(player))
+			updateBoard(plot, PlayerDataManager.Get(player), player)
 		end
 		PlayerDataSignals.FireCashChanged(player)
 	end
@@ -382,7 +407,7 @@ local function setupUpgradePlatform(plot: Instance)
 		if success then
 			local data = PlayerDataManager.Get(player)
 			Remotes.StatsUpdate:FireClient(player, { Cash = data.Cash })
-			updateBoard(plot, data)
+			updateBoard(plot, data, player)
 			PlayerDataSignals.FireCashChanged(player)
 			print(("[Upgrade] %s bought conversion level %s"):format(player.Name, tostring(resultOrError)))
 		else
