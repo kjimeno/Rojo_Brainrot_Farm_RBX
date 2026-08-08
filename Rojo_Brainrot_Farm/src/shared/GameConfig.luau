@@ -249,23 +249,25 @@ GameConfig.ConversionUpgrade = {
 	-- No MaxLevel -- upgrades are purchasable indefinitely, the cost/rate formulas below already
 	-- generalize to any level with no cap baked in.
 	--
-	-- CostGrowth used to equal RateGrowth (both 1.4) -- meaning cost-per-unit-of-rate stayed
-	-- EXACTLY constant no matter how many levels you bought. The numbers looked exponential but
-	-- upgrading never actually got any less efficient, which is a big part of why progress felt
-	-- linear/unthrottled. Raising CostGrowth above RateGrowth makes each successive purchase
-	-- genuinely less cost-effective than the last -- real diminishing returns, not just bigger
-	-- numbers on both sides of the same ratio.
-	BaseCost = 1,
-	CostGrowth = 1.6,     -- each purchase costs 1.6x the previous one
+	-- Cost is a power curve, NOT exponential -- cost(level) = CostBase * (level + CostOffset) ^
+	-- CostExponent. Consecutive-purchase cost RATIOS start high (~1.6-2.1x) and steadily decay
+	-- toward ~1.14x as level climbs -- a constant-ratio (exponential) curve can't do that, its
+	-- ratio never changes. These three constants were fit to hit level 0 = $10 and level 22 =
+	-- $4238 exactly, landing within a few percent through the rest of the range.
+	CostBase = 0.0886,
+	CostOffset = 4.187,
+	CostExponent = 3.3,
 	RatePerLevel = 0.75,  -- how much the FIRST purchase adds to your rate
 	RateGrowth = 1.25,    -- each purchase's rate increase is 1.25x the previous purchase's increase (was 1.4 -- the granted rate itself was compounding too fast, independent of cost)
 }
 
 -- Deliberately independent of GetTotalBrainrotValue (unlike brainrot pricing above) -- this
--- still gets more expensive as you buy more of it (CostGrowth^currentLevel), just not also
--- taxed by how big your brainrot portfolio is.
+-- still gets more expensive as you buy more of it, just not also taxed by how big your
+-- brainrot portfolio is.
 function GameConfig.GetUpgradeCost(currentLevel: number): number
-	return math.floor(GameConfig.ConversionUpgrade.BaseCost * (GameConfig.ConversionUpgrade.CostGrowth ^ currentLevel))
+	local upgrade = GameConfig.ConversionUpgrade
+	local cost = upgrade.CostBase * ((currentLevel + upgrade.CostOffset) ^ upgrade.CostExponent)
+	return math.floor(cost + 0.5)
 end
 
 -- How much rate your NEXT purchase (going from currentLevel to currentLevel + 1) adds --
