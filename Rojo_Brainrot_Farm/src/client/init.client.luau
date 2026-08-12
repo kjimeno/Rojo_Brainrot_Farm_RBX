@@ -108,9 +108,11 @@ workspace.DescendantAdded:Connect(trackShopPlatform)
 -- kit): an ImageLabel with "main"/"shadow" TextLabels and a "Transactions" frame holding "Add"/
 -- "Subtract" badge templates. Energy/Rot Items has its own separate createRotsHudDisplay further
 -- down, built for the simpler rebuilt TitleLabel/CountLabel structure (Main.HUD.Up.RotsHUD) --
--- they used to share this same structure/function, hence the leftover shared helpers below.
--- Both react to our own Remotes.StatsUpdate instead of the kit's original
--- Player.leaderstats.*.Changed, since this game doesn't use leaderstats.
+-- different enough GUI shapes and gain-effect animations (queued list badge vs. floating drift-
+-- fade text) that they stay as two functions, but share the count-up tween/tick-sound driver and
+-- digit-scale formula below instead of each keeping its own copy. Both react to our own
+-- Remotes.StatsUpdate instead of the kit's original Player.leaderstats.*.Changed, since this game
+-- doesn't use leaderstats.
 -- Comma-formatted below 100,000, K/M/B/T-abbreviated above that -- see
 -- GameConfig.FormatAbbreviatedNumber for the shared rule (also used server-side for
 -- platform/billboard text, so both stay consistent).
@@ -123,36 +125,31 @@ local ENERGY_GAIN_TEXT_DISTANCE_MIN = 56 -- pixels
 local ENERGY_GAIN_TEXT_DISTANCE_MAX = 104 -- pixels
 local ENERGY_GAIN_TEXT_FADE_DURATION = 1.4 -- fade lasts longer now
 local ENERGY_GAIN_TEXT_MOVE_DURATION = 1.5 -- slightly outlasts the fade so it never visibly stops short
-local ENERGY_GAIN_TEXT_MIN_SCALE = 0.45 -- badge scale for a small gain (relative to the cloned AddTemplate's own size)
+local ENERGY_GAIN_TEXT_MIN_SCALE = 0.45 -- badge scale for a small gain
 local ENERGY_GAIN_TEXT_MAX_SCALE = 0.9 -- badge scale cap for a huge gain, so it can't grow unboundedly large
 local ENERGY_GAIN_TEXT_SCALE_PER_DIGIT = 0.13 -- how much scale grows per extra digit in the amount (log-based, so it stays smooth across 1 up into the hundreds of millions)
-local ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y = 10 -- pixels down from icon-center where it first appears; the random drift then continues from there
+local ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y = 10 -- pixels down from spawn-center where it first appears; the random drift then continues from there
 local ENERGY_GAIN_TEXT_SPEED_JITTER = 0.25 -- +/- this fraction of ENERGY_GAIN_TEXT_MOVE_DURATION, randomized per popup, so they don't all move at identical speed
 
--- `icon` is the ImageLabel itself (e.g. Main.HUD.Left.Icon); `statKey` is the field name to
--- watch for in Remotes.StatsUpdate payloads (e.g. "Cash", "StoredEnergy"); `showBadgeOnDecrease`
--- controls whether decreases get the floating badge callout too (Cash: yes, Energy: no);
--- `gainStyle` picks which visual a gain uses -- "list" is Cash's stacked Transactions badge,
--- "floating" is Energy's random-downward fading "+N" text.
-local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBadgeOnDecrease: boolean, gainStyle: string)
-	-- Icon's Size is scale-based, so its absolute pixel box changes shape as the window/viewport
-	-- ratio changes -- ScaleType.Fit keeps the image itself at its own real proportions inside
-	-- that box (letterboxing as needed) instead of stretching to fill whatever shape the box
-	-- ends up being. A UIAspectRatioConstraint would need to already know the image's correct
-	-- ratio to pin the box itself; this sidesteps that entirely by fixing it at the image level.
-	if icon:IsA("ImageLabel") or icon:IsA("ImageButton") then
-		(icon :: ImageLabel).ScaleType = Enum.ScaleType.Fit
-	end
+-- Digits (log10-based) rather than the raw amount, so a gain popup's size scales smoothly across
+-- the full 1 up into the hundreds of millions instead of maxing out almost immediately (or
+-- barely growing at all) with a linear formula. Shared by every stat display's gain popup.
+local function digitBasedScale(amount: number): number
+	local digits = math.floor(math.log(math.max(amount, 1), 10)) + 1
+	return math.clamp(
+		ENERGY_GAIN_TEXT_MIN_SCALE + (digits - 1) * ENERGY_GAIN_TEXT_SCALE_PER_DIGIT,
+		ENERGY_GAIN_TEXT_MIN_SCALE,
+		ENERGY_GAIN_TEXT_MAX_SCALE
+	)
+end
 
-	local TransactionRoot = icon.main.Transactions
-
-	local AddTemplate = TransactionRoot.Add
-	local SubTemplate = TransactionRoot.Subtract
-	AddTemplate.Parent = nil
-	SubTemplate.Parent = nil
-
-	local prevValue = 0
-	local hasInitialized = false
+-- Returns a tweenValue(from, to, duration) function bound to `setLabel` -- a smooth
+-- RenderStepped-driven lerp with a periodic tick sound while climbing. Each caller gets its own
+-- independent in-flight-tween state (activeRender) AND its own Sound instance -- sharing one
+-- Sound across displays would mean two displays counting up at once (e.g. Cash and Rot Items
+-- both gaining together) fight over the same instance's Play(), each retrigger cutting the
+-- other's tick off early.
+local function createCountUpTweener(setLabel: (number) -> ())
 	local activeRender = nil
 
 	local tickSound = Instance.new("Sound")
@@ -160,13 +157,7 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 	tickSound.Volume = 1
 	tickSound.Parent = SoundService
 
-	local function setLabel(amount: number)
-		local formatted = formatNumber(amount)
-		icon.main.Text = formatted
-		icon.shadow.Text = formatted
-	end
-
-	local function tweenValue(from: number, to: number, duration: number)
+	return function(from: number, to: number, duration: number)
 		if activeRender then
 			activeRender:Disconnect()
 			activeRender = nil
@@ -191,6 +182,38 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 			end
 		end)
 	end
+end
+
+-- `icon` is the ImageLabel itself (Main.HUD.Left.Icon); `statKey` is the field name to watch for
+-- in Remotes.StatsUpdate payloads ("Cash"); `showBadgeOnDecrease` controls whether decreases get
+-- the floating badge callout too.
+local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBadgeOnDecrease: boolean)
+	-- Icon's Size is scale-based, so its absolute pixel box changes shape as the window/viewport
+	-- ratio changes -- ScaleType.Fit keeps the image itself at its own real proportions inside
+	-- that box (letterboxing as needed) instead of stretching to fill whatever shape the box
+	-- ends up being. A UIAspectRatioConstraint would need to already know the image's correct
+	-- ratio to pin the box itself; this sidesteps that entirely by fixing it at the image level.
+	if icon:IsA("ImageLabel") or icon:IsA("ImageButton") then
+		(icon :: ImageLabel).ScaleType = Enum.ScaleType.Fit
+	end
+
+	local TransactionRoot = icon.main.Transactions
+
+	local AddTemplate = TransactionRoot.Add
+	local SubTemplate = TransactionRoot.Subtract
+	AddTemplate.Parent = nil
+	SubTemplate.Parent = nil
+
+	local prevValue = 0
+	local hasInitialized = false
+
+	local function setLabel(amount: number)
+		local formatted = formatNumber(amount)
+		icon.main.Text = formatted
+		icon.shadow.Text = formatted
+	end
+
+	local tweenValue = createCountUpTweener(setLabel)
 
 	local function showTransactionBadge(amount: number)
 		local template = amount > 0 and AddTemplate or SubTemplate
@@ -223,87 +246,6 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 		badge:Destroy()
 	end
 
-	-- Energy's gain callout: clones the SAME AddTemplate as the list badge above (so it keeps
-	-- the kit's original font/styling) but skips the open/close size animation entirely --
-	-- instead it drifts off in a random direction biased downward (never more than
-	-- ENERGY_GAIN_TEXT_MAX_ANGLE off straight-down) while fading out quickly, more like a
-	-- floating combat-text number than a queued notification.
-	local function playEnergyGainText(amount: number)
-		local badge = AddTemplate:Clone()
-		badge.Visible = true
-		badge.Parent = icon
-
-		local formatted = "+" .. formatNumber(amount)
-		badge.main.Text = formatted
-		badge.shadow.Text = formatted
-
-		-- The template's main/shadow labels were built for a growing left-to-right list item,
-		-- so their own Position/AnchorPoint likely put them off to one side of the badge rather
-		-- than centered in it. Re-centering just their ANCHOR/POSITION (not their Size, which is
-		-- what TextScaled uses to compute font size -- changing it would also change how big the
-		-- text renders, which is the "grows with digit count" look) keeps the exact same
-		-- size/growth behavior as before, just recentered.
-		for _, label in ipairs({ badge.main, badge.shadow }) do
-			label.AnchorPoint = Vector2.new(0.5, 0.5)
-			label.Position = UDim2.new(0.5, 0, 0.5, 0)
-			label.TextXAlignment = Enum.TextXAlignment.Center
-			label.TextYAlignment = Enum.TextYAlignment.Center
-		end
-
-		-- Bigger gains get a bigger badge -- digits (log10-based) rather than the raw amount, so
-		-- it scales smoothly across the full 1 to hundreds-of-millions range instead of maxing
-		-- out almost immediately (or barely growing at all) with a linear formula.
-		local digits = math.floor(math.log(math.max(amount, 1), 10)) + 1
-		local scale = math.clamp(
-			ENERGY_GAIN_TEXT_MIN_SCALE + (digits - 1) * ENERGY_GAIN_TEXT_SCALE_PER_DIGIT,
-			ENERGY_GAIN_TEXT_MIN_SCALE,
-			ENERGY_GAIN_TEXT_MAX_SCALE
-		)
-
-		local originalSize = badge.Size
-		badge.Size = UDim2.new(
-			originalSize.X.Scale * scale, originalSize.X.Offset * scale,
-			originalSize.Y.Scale * scale, originalSize.Y.Offset * scale
-		)
-
-		badge.AnchorPoint = Vector2.new(0.5, 0.5)
-		badge.Position = UDim2.new(0.5, 0, 0.5, ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y)
-
-		local angle = math.rad((math.random() * 2 - 1) * ENERGY_GAIN_TEXT_MAX_ANGLE)
-		local distance = ENERGY_GAIN_TEXT_DISTANCE_MIN + math.random() * (ENERGY_GAIN_TEXT_DISTANCE_MAX - ENERGY_GAIN_TEXT_DISTANCE_MIN)
-		local offsetX = math.sin(angle) * distance
-		-- Drift continues from the (already-offset) spawn point, so the random downward travel
-		-- stacks on top of ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y rather than starting over from center.
-		local offsetY = ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y + math.cos(angle) * distance -- angle measured from straight down, so this is always positive (downward)
-
-		local speedJitter = 1 + (math.random() * 2 - 1) * ENERGY_GAIN_TEXT_SPEED_JITTER
-		TweenService:Create(
-			badge,
-			TweenInfo.new(ENERGY_GAIN_TEXT_MOVE_DURATION * speedJitter, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{ Position = UDim2.new(0.5, offsetX, 0.5, offsetY) }
-		):Play()
-
-		local fadeInfo = TweenInfo.new(ENERGY_GAIN_TEXT_FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		local mainFade = TweenService:Create(badge.main, fadeInfo, { TextTransparency = 1, TextStrokeTransparency = 1 })
-		local shadowFade = TweenService:Create(badge.shadow, fadeInfo, { TextTransparency = 1, TextStrokeTransparency = 1 })
-		mainFade:Play()
-		shadowFade:Play()
-
-		-- The visible "stroke" is very likely a UIStroke object (its own separate .Transparency
-		-- property, NOT TextStrokeTransparency), which the tweens above never touch -- that's
-		-- why the fill fades smoothly but the outline just sits there opaque until badge:Destroy()
-		-- yanks it away all at once. Fade every UIStroke found anywhere under the badge too.
-		for _, descendant in ipairs(badge:GetDescendants()) do
-			if descendant:IsA("UIStroke") then
-				TweenService:Create(descendant, fadeInfo, { Transparency = 1 }):Play()
-			end
-		end
-
-		mainFade.Completed:Wait()
-
-		badge:Destroy()
-	end
-
 	Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
 		local newValue = stats[statKey]
 		if newValue == nil then return end
@@ -320,16 +262,10 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 		local diff = newValue - prevValue
 		if diff == 0 then return end
 
-		-- The number itself always tweens smoothly either direction; the floating badge
-		-- callout only shows for gains, unless showBadgeOnDecrease says decreases get one too.
+		-- The number itself always tweens smoothly either direction; the badge callout only
+		-- shows for gains, unless showBadgeOnDecrease says decreases get one too.
 		if diff > 0 or showBadgeOnDecrease then
-			if gainStyle == "floating" then
-				if diff > 0 then
-					task.spawn(playEnergyGainText, diff)
-				end
-			else
-				task.spawn(showTransactionBadge, diff)
-			end
+			task.spawn(showTransactionBadge, diff)
 		end
 		tweenValue(prevValue, newValue, 0.5)
 
@@ -343,45 +279,21 @@ end
 -- the "+N" gain popup is built fresh in code instead, styled by copying CountLabel's own Font/
 -- TextColor3/TextScaled/stroke properties LIVE at spawn time, so it always matches however
 -- CountLabel actually looks (including any future changes in Studio) without needing a template.
-local function createRotsHudDisplay(container: Instance, countLabel: TextLabel, statKey: string)
+local function createRotsHudDisplay(container: Instance, statKey: string)
+	local countLabel = container.CountLabel
+
 	local prevValue = 0
 	local hasInitialized = false
-	local activeRender = nil
-
-	local tickSound = Instance.new("Sound")
-	tickSound.SoundId = "rbxassetid://607665037"
-	tickSound.Volume = 1
-	tickSound.Parent = SoundService
 
 	local function setLabel(amount: number)
 		countLabel.Text = formatNumber(amount)
 	end
 
-	local function tweenValue(from: number, to: number, duration: number)
-		if activeRender then
-			activeRender:Disconnect()
-			activeRender = nil
-		end
+	local tweenValue = createCountUpTweener(setLabel)
 
-		local startTime = tick()
-		local lastTick = 0
-
-		activeRender = RunService.RenderStepped:Connect(function()
-			local alpha = math.clamp((tick() - startTime) / duration, 0, 1)
-			setLabel(math.floor(from + (to - from) * alpha))
-
-			if to > from and tick() - lastTick >= 0.05 then
-				lastTick = tick()
-				tickSound:Play()
-			end
-
-			if alpha >= 1 then
-				setLabel(to)
-				activeRender:Disconnect()
-				activeRender = nil
-			end
-		end)
-	end
+	-- Looked up once up front instead of re-querying CountLabel's children on every popup spawn --
+	-- its stroke (if any) doesn't change at runtime, so there's nothing to gain by re-scanning.
+	local strokeTemplate = countLabel:FindFirstChildOfClass("UIStroke")
 
 	local function playRotsGainText(amount: number)
 		local badge = Instance.new("TextLabel")
@@ -398,25 +310,16 @@ local function createRotsHudDisplay(container: Instance, countLabel: TextLabel, 
 		badge.Text = "+" .. formatNumber(amount)
 
 		-- The visible outline is often a separate UIStroke object (its own .Transparency, not
-		-- TextStrokeTransparency) rather than the legacy stroke properties above -- clone any
-		-- found on CountLabel so the popup matches whichever one it actually uses.
-		for _, descendant in ipairs(countLabel:GetChildren()) do
-			if descendant:IsA("UIStroke") then
-				local strokeCopy = descendant:Clone()
-				strokeCopy.Parent = badge
-			end
+		-- TextStrokeTransparency) rather than the legacy stroke properties above -- clone the
+		-- one found on CountLabel (if any) so the popup matches whichever one it actually uses.
+		if strokeTemplate then
+			local strokeCopy = strokeTemplate:Clone()
+			strokeCopy.Parent = badge
 		end
 
-		-- Bigger gains get a bigger badge -- digits (log10-based) rather than the raw amount, so
-		-- it scales smoothly across the full 1 to hundreds-of-millions range instead of maxing
-		-- out almost immediately (or barely growing at all) with a linear formula. Scaled off
-		-- CountLabel's own current on-screen size, so the popup stays proportionate to it.
-		local digits = math.floor(math.log(math.max(amount, 1), 10)) + 1
-		local scale = math.clamp(
-			ENERGY_GAIN_TEXT_MIN_SCALE + (digits - 1) * ENERGY_GAIN_TEXT_SCALE_PER_DIGIT,
-			ENERGY_GAIN_TEXT_MIN_SCALE,
-			ENERGY_GAIN_TEXT_MAX_SCALE
-		)
+		-- Bigger gains get a bigger badge, scaled off CountLabel's own current on-screen size so
+		-- the popup stays proportionate to it.
+		local scale = digitBasedScale(amount)
 		local baseSize = countLabel.AbsoluteSize
 		badge.Size = UDim2.new(0, baseSize.X * scale, 0, baseSize.Y * scale)
 
@@ -484,8 +387,9 @@ local Main = PlayerGui:WaitForChild("Main")
 -- under it) keeps pointing at the old, now-invisible instance, while the new visible one just
 -- shows whatever static placeholder text was set in Studio and never updates again.
 Main.ResetOnSpawn = false
-createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true, "list")
-createRotsHudDisplay(Main.HUD.Up.RotsHUD, Main.HUD.Up.RotsHUD.CountLabel, "StoredEnergy")
+local RotsHud = Main.HUD.Up.RotsHUD
+createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true)
+createRotsHudDisplay(RotsHud, "StoredEnergy")
 
 -- ===== Cash collect burst: icons burst out of the CoinVault in the air, then fly straight to you =====
 local CASH_BURST_MIN_COUNT = 5
@@ -686,11 +590,13 @@ if not RotItemIconsFolder then
 	warn("[RotIcons] ReplicatedStorage.Assets.RotItemIcons not found -- create that folder with at least one ImageLabel in it for the deposit rain effect to show anything.")
 end
 
+-- Fetched once instead of re-querying the folder's children on every single falling icon --
+-- the manually-added ImageLabels inside it aren't expected to change at runtime.
+local rotItemIcons = RotItemIconsFolder and RotItemIconsFolder:GetChildren() or {}
+
 local function getRandomRotItemIcon(): string
-	if not RotItemIconsFolder then return "" end
-	local icons = RotItemIconsFolder:GetChildren()
-	if #icons == 0 then return "" end
-	local chosen = icons[math.random(1, #icons)]
+	if #rotItemIcons == 0 then return "" end
+	local chosen = rotItemIcons[math.random(1, #rotItemIcons)]
 	return (chosen :: any).Image or ""
 end
 
@@ -1107,7 +1013,7 @@ Remotes.PlatformPress.OnClientEvent:Connect(playPlatformPress)
 local WARNING_HOLD_DURATION = 4 -- seconds of no new failures (of ANY type) before it starts fading
 local WARNING_FADE_DURATION = 0.5
 
-local warningIcon = Main.HUD.Up.RotsHUD
+local warningIcon = RotsHud
 
 local warningLabel = Instance.new("TextLabel")
 warningLabel.Name = "WarningLabel"

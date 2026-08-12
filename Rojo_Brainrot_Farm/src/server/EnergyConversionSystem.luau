@@ -169,7 +169,7 @@ local function updateBoard(plot: Instance, data, player: Player)
 	local rate = getCachedConversionRate(player, data)
 
 	if refs.TitleLabel then
-		refs.TitleLabel.Text = (data.SiloEnergy > 0) and "Converting Energy" or "No Energy"
+		refs.TitleLabel.Text = (data.SiloEnergy > 0) and "Converting Rot Items" or "No Rot Items"
 	end
 	if refs.EnergyLabel then
 		refs.EnergyLabel.Text = GameConfig.FormatAbbreviatedNumber(data.SiloEnergy)
