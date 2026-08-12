@@ -103,12 +103,14 @@ for _, descendant in ipairs(workspace:GetDescendants()) do
 end
 workspace.DescendantAdded:Connect(trackShopPlatform)
 
--- ===== Animated stat displays (from the purchased UI kit's "Icon" HUD element) =====
--- Same reusable structure for both Cash (Main.HUD.Left.Icon) and Energy
--- (Main.HUD.Up.Icon): an ImageLabel with "main"/"shadow" TextLabels and a "Transactions"
--- frame holding "Add"/"Subtract" badge templates. Reacts to our own Remotes.StatsUpdate
--- instead of the kit's original Player.leaderstats.*.Changed, since this game doesn't use
--- leaderstats. The tween/tick sound/floating +/- badge animation is unchanged from the kit.
+-- ===== Animated stat displays =====
+-- createAnimatedStatDisplay below is Cash's display (Main.HUD.Left.Icon, from the purchased UI
+-- kit): an ImageLabel with "main"/"shadow" TextLabels and a "Transactions" frame holding "Add"/
+-- "Subtract" badge templates. Energy/Rot Items has its own separate createRotsHudDisplay further
+-- down, built for the simpler rebuilt TitleLabel/CountLabel structure (Main.HUD.Up.RotsHUD) --
+-- they used to share this same structure/function, hence the leftover shared helpers below.
+-- Both react to our own Remotes.StatsUpdate instead of the kit's original
+-- Player.leaderstats.*.Changed, since this game doesn't use leaderstats.
 -- Comma-formatted below 100,000, K/M/B/T-abbreviated above that -- see
 -- GameConfig.FormatAbbreviatedNumber for the shared rule (also used server-side for
 -- platform/billboard text, so both stay consistent).
@@ -335,6 +337,146 @@ local function createAnimatedStatDisplay(icon: Instance, statKey: string, showBa
 	end)
 end
 
+-- ===== Rot Items count (Main.HUD.Up.RotsHUD) =====
+-- Rebuilt with a simpler TitleLabel/CountLabel structure -- no more Icon/main/shadow/Transactions
+-- template to clone the gain popup from. The count-up tween still targets CountLabel directly;
+-- the "+N" gain popup is built fresh in code instead, styled by copying CountLabel's own Font/
+-- TextColor3/TextScaled/stroke properties LIVE at spawn time, so it always matches however
+-- CountLabel actually looks (including any future changes in Studio) without needing a template.
+local function createRotsHudDisplay(container: Instance, countLabel: TextLabel, statKey: string)
+	local prevValue = 0
+	local hasInitialized = false
+	local activeRender = nil
+
+	local tickSound = Instance.new("Sound")
+	tickSound.SoundId = "rbxassetid://607665037"
+	tickSound.Volume = 1
+	tickSound.Parent = SoundService
+
+	local function setLabel(amount: number)
+		countLabel.Text = formatNumber(amount)
+	end
+
+	local function tweenValue(from: number, to: number, duration: number)
+		if activeRender then
+			activeRender:Disconnect()
+			activeRender = nil
+		end
+
+		local startTime = tick()
+		local lastTick = 0
+
+		activeRender = RunService.RenderStepped:Connect(function()
+			local alpha = math.clamp((tick() - startTime) / duration, 0, 1)
+			setLabel(math.floor(from + (to - from) * alpha))
+
+			if to > from and tick() - lastTick >= 0.05 then
+				lastTick = tick()
+				tickSound:Play()
+			end
+
+			if alpha >= 1 then
+				setLabel(to)
+				activeRender:Disconnect()
+				activeRender = nil
+			end
+		end)
+	end
+
+	local function playRotsGainText(amount: number)
+		local badge = Instance.new("TextLabel")
+		badge.Name = "GainPopup"
+		badge.BackgroundTransparency = 1
+		badge.Font = countLabel.Font
+		badge.TextColor3 = countLabel.TextColor3
+		badge.TextScaled = countLabel.TextScaled
+		badge.TextStrokeColor3 = countLabel.TextStrokeColor3
+		badge.TextStrokeTransparency = countLabel.TextStrokeTransparency
+		badge.TextXAlignment = Enum.TextXAlignment.Center
+		badge.TextYAlignment = Enum.TextYAlignment.Center
+		badge.ZIndex = countLabel.ZIndex + 1
+		badge.Text = "+" .. formatNumber(amount)
+
+		-- The visible outline is often a separate UIStroke object (its own .Transparency, not
+		-- TextStrokeTransparency) rather than the legacy stroke properties above -- clone any
+		-- found on CountLabel so the popup matches whichever one it actually uses.
+		for _, descendant in ipairs(countLabel:GetChildren()) do
+			if descendant:IsA("UIStroke") then
+				local strokeCopy = descendant:Clone()
+				strokeCopy.Parent = badge
+			end
+		end
+
+		-- Bigger gains get a bigger badge -- digits (log10-based) rather than the raw amount, so
+		-- it scales smoothly across the full 1 to hundreds-of-millions range instead of maxing
+		-- out almost immediately (or barely growing at all) with a linear formula. Scaled off
+		-- CountLabel's own current on-screen size, so the popup stays proportionate to it.
+		local digits = math.floor(math.log(math.max(amount, 1), 10)) + 1
+		local scale = math.clamp(
+			ENERGY_GAIN_TEXT_MIN_SCALE + (digits - 1) * ENERGY_GAIN_TEXT_SCALE_PER_DIGIT,
+			ENERGY_GAIN_TEXT_MIN_SCALE,
+			ENERGY_GAIN_TEXT_MAX_SCALE
+		)
+		local baseSize = countLabel.AbsoluteSize
+		badge.Size = UDim2.new(0, baseSize.X * scale, 0, baseSize.Y * scale)
+
+		badge.AnchorPoint = Vector2.new(0.5, 0.5)
+		badge.Position = UDim2.new(0.5, 0, 0.5, ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y)
+		badge.Parent = container
+
+		local angle = math.rad((math.random() * 2 - 1) * ENERGY_GAIN_TEXT_MAX_ANGLE)
+		local distance = ENERGY_GAIN_TEXT_DISTANCE_MIN + math.random() * (ENERGY_GAIN_TEXT_DISTANCE_MAX - ENERGY_GAIN_TEXT_DISTANCE_MIN)
+		local offsetX = math.sin(angle) * distance
+		-- Drift continues from the (already-offset) spawn point, so the random downward travel
+		-- stacks on top of ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y rather than starting over from center.
+		local offsetY = ENERGY_GAIN_TEXT_SPAWN_OFFSET_Y + math.cos(angle) * distance -- angle measured from straight down, so this is always positive (downward)
+
+		local speedJitter = 1 + (math.random() * 2 - 1) * ENERGY_GAIN_TEXT_SPEED_JITTER
+		TweenService:Create(
+			badge,
+			TweenInfo.new(ENERGY_GAIN_TEXT_MOVE_DURATION * speedJitter, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ Position = UDim2.new(0.5, offsetX, 0.5, offsetY) }
+		):Play()
+
+		local fadeInfo = TweenInfo.new(ENERGY_GAIN_TEXT_FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local mainFade = TweenService:Create(badge, fadeInfo, { TextTransparency = 1, TextStrokeTransparency = 1 })
+		mainFade:Play()
+
+		for _, descendant in ipairs(badge:GetDescendants()) do
+			if descendant:IsA("UIStroke") then
+				TweenService:Create(descendant, fadeInfo, { Transparency = 1 }):Play()
+			end
+		end
+
+		mainFade.Completed:Wait()
+		badge:Destroy()
+	end
+
+	Remotes.StatsUpdate.OnClientEvent:Connect(function(stats)
+		local newValue = stats[statKey]
+		if newValue == nil then return end
+
+		if not hasInitialized then
+			-- The first value we ever see is the loaded starting balance, not a real gain --
+			-- snap to it silently, no count-up animation, no popup.
+			hasInitialized = true
+			prevValue = newValue
+			setLabel(newValue)
+			return
+		end
+
+		local diff = newValue - prevValue
+		if diff == 0 then return end
+
+		if diff > 0 then
+			task.spawn(playRotsGainText, diff)
+		end
+		tweenValue(prevValue, newValue, 0.5)
+
+		prevValue = newValue
+	end)
+end
+
 local Main = PlayerGui:WaitForChild("Main")
 -- ScreenGui.ResetOnSpawn defaults to true -- Roblox destroys and recreates the ENTIRE GUI fresh
 -- from StarterGui every time the character respawns. That silently swaps the live, StatsUpdate-
@@ -343,7 +485,7 @@ local Main = PlayerGui:WaitForChild("Main")
 -- shows whatever static placeholder text was set in Studio and never updates again.
 Main.ResetOnSpawn = false
 createAnimatedStatDisplay(Main.HUD.Left.Icon, "Cash", true, "list")
-createAnimatedStatDisplay(Main.HUD.Up.Icon, "StoredEnergy", false, "floating")
+createRotsHudDisplay(Main.HUD.Up.RotsHUD, Main.HUD.Up.RotsHUD.CountLabel, "StoredEnergy")
 
 -- ===== Cash collect burst: icons burst out of the CoinVault in the air, then fly straight to you =====
 local CASH_BURST_MIN_COUNT = 5
@@ -531,6 +673,27 @@ energyDropGui.ResetOnSpawn = false
 energyDropGui.IgnoreGuiInset = true
 energyDropGui.Parent = PlayerGui
 
+-- Not under ReplicatedStorage.Shared (which Rojo fully owns and mirrors from disk -- anything
+-- added there manually in Studio would get wiped on the next sync) -- a separate,
+-- Rojo-untouched folder instead, holding however many rot item icon variants you want. Picks a
+-- fresh random one per falling icon, so a single rain burst mixes whichever variants exist.
+-- WaitForChild WITH a timeout, not left open-ended -- an open-ended one would block this entire
+-- script (everything below this line) forever if the folder doesn't exist yet, instead of just
+-- this one effect quietly failing.
+local assetsFolder = ReplicatedStorage:WaitForChild("Assets", 5)
+local RotItemIconsFolder = assetsFolder and assetsFolder:WaitForChild("RotItemIcons", 5)
+if not RotItemIconsFolder then
+	warn("[RotIcons] ReplicatedStorage.Assets.RotItemIcons not found -- create that folder with at least one ImageLabel in it for the deposit rain effect to show anything.")
+end
+
+local function getRandomRotItemIcon(): string
+	if not RotItemIconsFolder then return "" end
+	local icons = RotItemIconsFolder:GetChildren()
+	if #icons == 0 then return "" end
+	local chosen = icons[math.random(1, #icons)]
+	return (chosen :: any).Image or ""
+end
+
 local function playEnergyDropIcon(iconImage: string, startX: number)
 	local icon = Instance.new("ImageLabel")
 	icon.BackgroundTransparency = 1
@@ -561,7 +724,6 @@ local function playEnergyDropIcon(iconImage: string, startX: number)
 end
 
 local function playEnergyDepositRain()
-	local iconImage = Main.HUD.Up.Icon.Image
 	local count = math.random(ENERGY_DROP_MIN_COUNT, ENERGY_DROP_MAX_COUNT)
 
 	-- Evenly divides the screen width into `count` slots and gives each icon a small random
@@ -572,7 +734,7 @@ local function playEnergyDepositRain()
 		local slotCenter = (i - 0.5) * slotWidth
 		local jitter = (math.random() * 2 - 1) * (slotWidth * ENERGY_DROP_SLOT_JITTER)
 		local startX = math.clamp(slotCenter + jitter, 0, 1)
-		task.spawn(playEnergyDropIcon, iconImage, startX)
+		task.spawn(playEnergyDropIcon, getRandomRotItemIcon(), startX)
 	end
 end
 
@@ -945,7 +1107,7 @@ Remotes.PlatformPress.OnClientEvent:Connect(playPlatformPress)
 local WARNING_HOLD_DURATION = 4 -- seconds of no new failures (of ANY type) before it starts fading
 local WARNING_FADE_DURATION = 0.5
 
-local warningIcon = Main.HUD.Up.Icon
+local warningIcon = Main.HUD.Up.RotsHUD
 
 local warningLabel = Instance.new("TextLabel")
 warningLabel.Name = "WarningLabel"
@@ -959,7 +1121,7 @@ warningLabel.TextColor3 = Color3.new(1, 1, 1)
 warningLabel.TextTransparency = 1
 warningLabel.TextStrokeTransparency = 1 -- always fully off -- the UIStroke below is the only visible outline now, so this doesn't double up
 warningLabel.Text = ""
-warningLabel.ZIndex = warningIcon.main.ZIndex + 10
+warningLabel.ZIndex = warningIcon.CountLabel.ZIndex + 10
 warningLabel.Parent = warningIcon
 
 -- A UIStroke gives an adjustable Thickness, unlike the built-in TextStrokeTransparency outline
